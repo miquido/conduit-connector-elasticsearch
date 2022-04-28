@@ -39,19 +39,33 @@ func ParseConfig(cfgRaw map[string]string) (Config, error) {
 		return Config{}, requiredConfigErr(ConfigKeyIndex)
 	}
 
-	if bulkSize, ok := cfgRaw[ConfigKeyBulkSize]; !ok {
-		return Config{}, requiredConfigErr(ConfigKeyBulkSize)
-	} else if bulkSizeParsed, err := strconv.ParseUint(bulkSize, 10, 64); err != nil {
-		return Config{}, fmt.Errorf("failed to parse bulkSize config value: %w", err)
-	} else if bulkSizeParsed <= 0 {
-		return Config{}, fmt.Errorf("failed to parse bulkSize config value: value must be greated than 0")
-	} else {
-		cfg.BulkSize = bulkSizeParsed
+	bulkSizeParsed, err := parseBulkSizeConfigValue(cfgRaw)
+	if err != nil {
+		return Config{}, err
 	}
+
+	cfg.BulkSize = bulkSizeParsed
 
 	return cfg, nil
 }
 
 func requiredConfigErr(name string) error {
 	return fmt.Errorf("%q config value must be set", name)
+}
+
+func parseBulkSizeConfigValue(cfgRaw map[string]string) (uint64, error) {
+	bulkSize, ok := cfgRaw[ConfigKeyBulkSize]
+	if !ok {
+		return 0, requiredConfigErr(ConfigKeyBulkSize)
+	}
+
+	bulkSizeParsed, err := strconv.ParseUint(bulkSize, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse bulkSize config value: %w", err)
+	}
+	if bulkSizeParsed <= 0 {
+		return 0, fmt.Errorf("failed to parse bulkSize config value: value must be greated than 0")
+	}
+
+	return bulkSizeParsed, nil
 }
