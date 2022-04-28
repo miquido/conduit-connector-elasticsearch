@@ -90,11 +90,11 @@ func (d *Destination) Flush(ctx context.Context) error {
 		// actionAndMetadata
 		entryMetadata, err := json.Marshal(actionAndMetadata{
 			Update: struct {
-				Id              string `json:"_id"`
+				ID              string `json:"_id"`
 				Index           string `json:"_index"`
 				RetryOnConflict int    `json:"retry_on_conflict"`
 			}{
-				Id:              key,
+				ID:              key,
 				Index:           d.config.Index,
 				RetryOnConflict: 3,
 			},
@@ -156,9 +156,9 @@ func (d *Destination) Flush(ctx context.Context) error {
 	}
 
 	for _, item := range response.Items {
-		ackFunc, exists := d.ackFuncsBuffer[item.Update.Id]
+		ackFunc, exists := d.ackFuncsBuffer[item.Update.ID]
 		if !exists {
-			return fmt.Errorf("bulk response failure: could not ack item with key=%s: no ack function was registered", item.Update.Id)
+			return fmt.Errorf("bulk response failure: could not ack item with key=%s: no ack function was registered", item.Update.ID)
 		}
 
 		if item.Update.Status == http.StatusOK {
@@ -171,7 +171,7 @@ func (d *Destination) Flush(ctx context.Context) error {
 
 		if err := ackFunc(fmt.Errorf(
 			"item with key=%s upsert failure: [%s] %s: %s",
-			item.Update.Id,
+			item.Update.ID,
 			item.Update.Error.Type,
 			item.Update.Error.Reason,
 			item.Update.Error.CausedBy,
@@ -193,7 +193,7 @@ func (d *Destination) Teardown(context.Context) error {
 
 type actionAndMetadata struct {
 	Update struct {
-		Id              string `json:"_id"`
+		ID              string `json:"_id"`
 		Index           string `json:"_index"`
 		RetryOnConflict int    `json:"retry_on_conflict"`
 	} `json:"update"`
@@ -211,7 +211,7 @@ type bulkResponse struct {
 		Update struct {
 			Index   string `json:"_index"`
 			Type    string `json:"_type"`
-			Id      string `json:"_id"`
+			ID      string `json:"_id"`
 			Version int    `json:"_version,omitempty"`
 			Result  string `json:"result,omitempty"`
 			Shards  struct {
