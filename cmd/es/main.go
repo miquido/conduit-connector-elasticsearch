@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/conduitio/conduit-connector-elasticsearch/destination"
-	"github.com/conduitio/conduit-connector-elasticsearch/internal"
 	sdk "github.com/conduitio/conduit-connector-sdk"
+	"github.com/miquido/conduit-connector-elasticsearch/destination"
+	"github.com/miquido/conduit-connector-elasticsearch/internal"
 )
 
 func main() {
