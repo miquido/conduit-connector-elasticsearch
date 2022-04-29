@@ -1,4 +1,4 @@
-package internal
+package elasticsearch
 
 import (
 	sdk "github.com/conduitio/conduit-connector-sdk"
