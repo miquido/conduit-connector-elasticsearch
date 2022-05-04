@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"sync"
 
 	sdk "github.com/conduitio/conduit-connector-sdk"
@@ -107,10 +106,26 @@ func (d *Destination) Flush(ctx context.Context) error {
 		data.WriteRune('\n')
 
 		// optionalSource
-		entrySource, err := json.Marshal(optionalSource{
-			Doc:         item.Payload.Bytes(),
+		sourcePayload := optionalSource{
 			DocAsUpsert: true,
-		})
+		}
+
+		switch itemPayload := item.Payload.(type) {
+		case sdk.StructuredData:
+			// Payload is potentially convertable into JSON
+			itemPayloadMarshalled, err := json.Marshal(itemPayload)
+			if err != nil {
+				return fmt.Errorf("failed to prepare data with key=%s: %w", key, err)
+			}
+
+			sourcePayload.Doc = itemPayloadMarshalled
+
+		default:
+			// Nothing more can be done, we can trust the source to provide valid JSON
+			sourcePayload.Doc = itemPayload.Bytes()
+		}
+
+		entrySource, err := json.Marshal(sourcePayload)
 		if err != nil {
 			return fmt.Errorf("failed to prepare data with key=%s: %w", key, err)
 		}
@@ -161,7 +176,7 @@ func (d *Destination) Flush(ctx context.Context) error {
 			return fmt.Errorf("bulk response failure: could not ack item with key=%s: no ack function was registered", item.Update.ID)
 		}
 
-		if item.Update.Status == http.StatusOK {
+		if item.Update.Status >= 200 && item.Update.Status < 300 {
 			if err := ackFunc(nil); err != nil {
 				return err
 			}
