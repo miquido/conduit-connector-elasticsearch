@@ -2,10 +2,10 @@ package main
 
 import (
 	sdk "github.com/conduitio/conduit-connector-sdk"
-	"github.com/miquido/conduit-connector-elasticsearch"
-	"github.com/miquido/conduit-connector-elasticsearch/destination"
+	es "github.com/miquido/conduit-connector-elasticsearch"
+	esDestination "github.com/miquido/conduit-connector-elasticsearch/destination"
 )
 
 func main() {
-	sdk.Serve(elasticsearch.Specification, nil, destination.NewDestination)
+	sdk.Serve(es.Specification, nil, esDestination.NewDestination)
 }

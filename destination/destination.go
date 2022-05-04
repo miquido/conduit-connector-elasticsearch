@@ -81,116 +81,52 @@ func (d *Destination) Flush(ctx context.Context) error {
 	}
 
 	// Prepare request payload
-	var data bytes.Buffer
+	data := &bytes.Buffer{}
 
 	for _, item := range d.recordsBuffer {
 		key := string(item.Key.Bytes())
 
-		// actionAndMetadata
-		entryMetadata, err := json.Marshal(actionAndMetadata{
-			Update: struct {
-				ID              string `json:"_id"`
-				Index           string `json:"_index"`
-				RetryOnConflict int    `json:"retry_on_conflict"`
-			}{
-				ID:              key,
-				Index:           d.config.Index,
-				RetryOnConflict: 3,
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("failed to prepare metadata with key=%s: %w", key, err)
-		}
-
-		data.Write(entryMetadata)
-		data.WriteRune('\n')
-
-		// optionalSource
-		sourcePayload := optionalSource{
-			DocAsUpsert: true,
-		}
-
-		switch itemPayload := item.Payload.(type) {
-		case sdk.StructuredData:
-			// Payload is potentially convertable into JSON
-			itemPayloadMarshalled, err := json.Marshal(itemPayload)
-			if err != nil {
-				return fmt.Errorf("failed to prepare data with key=%s: %w", key, err)
+		switch action := item.Metadata["action"]; action {
+		case "created", "updated":
+			if err := d.writeUpsertOperation(key, data, item); err != nil {
+				return err
 			}
 
-			sourcePayload.Doc = itemPayloadMarshalled
+		case "deleted":
+			if err := d.writeDeleteOperation(key, data); err != nil {
+				return err
+			}
 
 		default:
-			// Nothing more can be done, we can trust the source to provide valid JSON
-			sourcePayload.Doc = itemPayload.Bytes()
-		}
+			sdk.Logger(ctx).Warn().Msgf("unsupported action: %+v", action)
 
-		entrySource, err := json.Marshal(sourcePayload)
-		if err != nil {
-			return fmt.Errorf("failed to prepare data with key=%s: %w", key, err)
+			continue
 		}
-
-		data.Write(entrySource)
-		data.WriteRune('\n')
 	}
-
-	fmt.Println(data.String())
 
 	// Send the bulk request
-	result, err := d.client.Bulk(bytes.NewReader(data.Bytes()), d.client.Bulk.WithContext(ctx))
+	response, err := d.executeBulkRequest(ctx, data)
 	if err != nil {
-		return fmt.Errorf("bulk request failure: %w", err)
-	}
-	if result.IsError() {
-		bodyContents, err := io.ReadAll(result.Body)
-		if err != nil {
-			return fmt.Errorf("bulk request failure: failed to read the result: %w", err)
-		}
-		defer result.Body.Close()
-
-		var errorDetails genericError
-		if err := json.Unmarshal(bodyContents, &errorDetails); err != nil {
-			return fmt.Errorf("bulk request failure: %s", result.Status())
-		}
-
-		return fmt.Errorf("bulk request failure: %s: %s", errorDetails.Error.Type, errorDetails.Error.Reason)
-	}
-
-	bodyContents, err := io.ReadAll(result.Body)
-	if err != nil {
-		return fmt.Errorf("bulk response failure: failed to read the result: %w", err)
-	}
-	defer result.Body.Close()
-
-	fmt.Println(string(bodyContents))
-
-	// Read individual errors
-	var response bulkResponse
-	if err := json.Unmarshal(bodyContents, &response); err != nil {
-		return fmt.Errorf("bulk response failure: could not read the response: %w", err)
+		return err
 	}
 
 	for _, item := range response.Items {
-		ackFunc, exists := d.ackFuncsBuffer[item.Update.ID]
-		if !exists {
-			return fmt.Errorf("bulk response failure: could not ack item with key=%s: no ack function was registered", item.Update.ID)
-		}
+		var itemResponse bulkResponseItem
 
-		if item.Update.Status >= 200 && item.Update.Status < 300 {
-			if err := ackFunc(nil); err != nil {
-				return err
-			}
+		switch {
+		case item.Update != nil:
+			itemResponse = *item.Update
+
+		case item.Delete != nil:
+			itemResponse = *item.Delete
+
+		default:
+			sdk.Logger(ctx).Warn().Msg("no update or delete details were found in Elasticsearch response")
 
 			continue
 		}
 
-		if err := ackFunc(fmt.Errorf(
-			"item with key=%s upsert failure: [%s] %s: %s",
-			item.Update.ID,
-			item.Update.Error.Type,
-			item.Update.Error.Reason,
-			item.Update.Error.CausedBy,
-		)); err != nil {
+		if err := d.sendAckForOperation(itemResponse); err != nil {
 			return err
 		}
 	}
@@ -206,12 +142,164 @@ func (d *Destination) Teardown(context.Context) error {
 	return nil // No close routine needed
 }
 
+func (d *Destination) writeDeleteOperation(key string, data *bytes.Buffer) error {
+	// actionAndMetadata
+	entryMetadata, err := json.Marshal(actionAndMetadata{
+		Delete: &deleteAction{
+			ID:    key,
+			Index: d.config.Index,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to prepare metadata with key=%s: %w", key, err)
+	}
+
+	data.Write(entryMetadata)
+	data.WriteRune('\n')
+	return nil
+}
+
+func (d *Destination) writeUpsertOperation(key string, data *bytes.Buffer, item sdk.Record) error {
+	// actionAndMetadata
+	entryMetadata, err := json.Marshal(actionAndMetadata{
+		Update: &updateAction{
+			ID:              key,
+			Index:           d.config.Index,
+			RetryOnConflict: 3,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to prepare metadata with key=%s: %w", key, err)
+	}
+
+	data.Write(entryMetadata)
+	data.WriteRune('\n')
+
+	// optionalSource
+	sourcePayload := optionalSource{
+		DocAsUpsert: true,
+	}
+
+	switch itemPayload := item.Payload.(type) {
+	case sdk.StructuredData:
+		// Payload is potentially convertable into JSON
+		itemPayloadMarshalled, err := json.Marshal(itemPayload)
+		if err != nil {
+			return fmt.Errorf("failed to prepare data with key=%s: %w", key, err)
+		}
+
+		sourcePayload.Doc = itemPayloadMarshalled
+
+	default:
+		// Nothing more can be done, we can trust the source to provide valid JSON
+		sourcePayload.Doc = itemPayload.Bytes()
+	}
+
+	entrySource, err := json.Marshal(sourcePayload)
+	if err != nil {
+		return fmt.Errorf("failed to prepare data with key=%s: %w", key, err)
+	}
+
+	data.Write(entrySource)
+	data.WriteRune('\n')
+	return nil
+}
+
+func (d *Destination) executeBulkRequest(ctx context.Context, data *bytes.Buffer) (bulkResponse, error) {
+	if data.Len() < 1 {
+		sdk.Logger(ctx).Info().Msg("no operations to execute in bulk, skipping")
+
+		return bulkResponse{}, nil
+	}
+
+	defer data.Reset()
+
+	result, err := d.client.Bulk(bytes.NewReader(data.Bytes()), d.client.Bulk.WithContext(ctx))
+	if err != nil {
+		return bulkResponse{}, fmt.Errorf("bulk request failure: %w", err)
+	}
+	if result.IsError() {
+		bodyContents, err := io.ReadAll(result.Body)
+		if err != nil {
+			return bulkResponse{}, fmt.Errorf("bulk request failure: failed to read the result: %w", err)
+		}
+		defer result.Body.Close()
+
+		var errorDetails genericError
+		if err := json.Unmarshal(bodyContents, &errorDetails); err != nil {
+			return bulkResponse{}, fmt.Errorf("bulk request failure: %s", result.Status())
+		}
+
+		return bulkResponse{}, fmt.Errorf("bulk request failure: %s: %s", errorDetails.Error.Type, errorDetails.Error.Reason)
+	}
+
+	bodyContents, err := io.ReadAll(result.Body)
+	if err != nil {
+		return bulkResponse{}, fmt.Errorf("bulk response failure: failed to read the result: %w", err)
+	}
+	defer result.Body.Close()
+
+	// Read individual errors
+	var response bulkResponse
+	if err := json.Unmarshal(bodyContents, &response); err != nil {
+		return bulkResponse{}, fmt.Errorf("bulk response failure: could not read the response: %w", err)
+	}
+
+	return response, nil
+}
+
+func (d *Destination) sendAckForOperation(itemResponse bulkResponseItem) error {
+	ackFunc, exists := d.ackFuncsBuffer[itemResponse.ID]
+	if !exists {
+		return fmt.Errorf("bulk response failure: could not ack item with key=%s: no ack function was registered", itemResponse.ID)
+	}
+
+	if itemResponse.Status >= 200 && itemResponse.Status < 300 {
+		if err := ackFunc(nil); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	var operationError error
+
+	if itemResponse.Error == nil {
+		operationError = fmt.Errorf(
+			"item with key=%s upsert/delete failure: unknown error",
+			itemResponse.ID,
+		)
+	} else {
+		operationError = fmt.Errorf(
+			"item with key=%s upsert/delete failure: [%s] %s: %s",
+			itemResponse.ID,
+			itemResponse.Error.Type,
+			itemResponse.Error.Reason,
+			itemResponse.Error.CausedBy,
+		)
+	}
+
+	if err := ackFunc(operationError); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 type actionAndMetadata struct {
-	Update struct {
-		ID              string `json:"_id"`
-		Index           string `json:"_index"`
-		RetryOnConflict int    `json:"retry_on_conflict"`
-	} `json:"update"`
+	Update *updateAction `json:"update,omitempty"`
+	Delete *deleteAction `json:"delete,omitempty"`
+}
+
+type updateAction struct {
+	ID              string `json:"_id"`
+	Index           string `json:"_index"`
+	RetryOnConflict int    `json:"retry_on_conflict"`
+}
+
+type deleteAction struct {
+	ID    string `json:"_id"`
+	Index string `json:"_index"`
 }
 
 type optionalSource struct {
@@ -223,27 +311,30 @@ type bulkResponse struct {
 	Took   int  `json:"took"`
 	Errors bool `json:"errors"`
 	Items  []struct {
-		Update struct {
-			Index   string `json:"_index"`
-			Type    string `json:"_type"`
-			ID      string `json:"_id"`
-			Version int    `json:"_version,omitempty"`
-			Result  string `json:"result,omitempty"`
-			Shards  struct {
-				Total      int `json:"total"`
-				Successful int `json:"successful"`
-				Failed     int `json:"failed"`
-			} `json:"_shards,omitempty"`
-			SeqNo       int `json:"_seq_no,omitempty"`
-			PrimaryTerm int `json:"_primary_term,omitempty"`
-			Status      int `json:"status"`
-			Error       struct {
-				Type     string          `json:"type"`
-				Reason   string          `json:"reason"`
-				CausedBy json.RawMessage `json:"caused_by"`
-			} `json:"error,omitempty"`
-		} `json:"update"`
+		Update *bulkResponseItem `json:"update,omitempty"`
+		Delete *bulkResponseItem `json:"delete,omitempty"`
 	} `json:"items"`
+}
+
+type bulkResponseItem struct {
+	Index   string `json:"_index"`
+	Type    string `json:"_type"`
+	ID      string `json:"_id"`
+	Version int    `json:"_version,omitempty"`
+	Result  string `json:"result,omitempty"`
+	Shards  *struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Failed     int `json:"failed"`
+	} `json:"_shards,omitempty"`
+	SeqNo       int `json:"_seq_no,omitempty"`
+	PrimaryTerm int `json:"_primary_term,omitempty"`
+	Status      int `json:"status"`
+	Error       *struct {
+		Type     string          `json:"type"`
+		Reason   string          `json:"reason"`
+		CausedBy json.RawMessage `json:"caused_by"`
+	} `json:"error,omitempty"`
 }
 
 type genericError struct {
