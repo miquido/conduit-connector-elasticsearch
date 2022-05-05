@@ -1,3 +1,17 @@
+// Copyright © 2022 Meroxa, Inc. and Miquido
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package destination
 
 import (
@@ -32,7 +46,8 @@ func (d *Destination) Configure(_ context.Context, cfgRaw map[string]string) (er
 	return
 }
 
-func (d *Destination) Open(_ context.Context) (err error) {
+func (d *Destination) Open(ctx context.Context) (err error) {
+	// Initialize Elasticsearch client
 	d.client, err = elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{d.config.Host},
 		Username:  d.config.Username,
@@ -42,7 +57,8 @@ func (d *Destination) Open(_ context.Context) (err error) {
 		return fmt.Errorf("connection could not be established: %w", err)
 	}
 
-	ping, err := d.client.Ping()
+	// Check the connection
+	ping, err := d.client.Ping(d.client.Ping.WithContext(ctx))
 	if err != nil {
 		return fmt.Errorf("connection could not be established: %w", err)
 	}
@@ -50,9 +66,8 @@ func (d *Destination) Open(_ context.Context) (err error) {
 		return fmt.Errorf("connection could not be established: host ping failed: %s", ping.Status())
 	}
 
-	d.mutex = sync.Mutex{}
-
 	// Initializing the buffer
+	d.mutex = sync.Mutex{}
 	d.recordsBuffer = make([]sdk.Record, 0, d.config.BulkSize)
 	d.ackFuncsBuffer = make(map[string]sdk.AckFunc, d.config.BulkSize)
 
@@ -60,11 +75,16 @@ func (d *Destination) Open(_ context.Context) (err error) {
 }
 
 func (d *Destination) WriteAsync(ctx context.Context, record sdk.Record, ackFunc sdk.AckFunc) error {
+	key := string(record.Key.Bytes())
+	if err := ackFunc(fmt.Errorf("record Key is required")); err != nil {
+		return err
+	}
+
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
 	d.recordsBuffer = append(d.recordsBuffer, record)
-	d.ackFuncsBuffer[string(record.Key.Bytes())] = ackFunc
+	d.ackFuncsBuffer[key] = ackFunc
 
 	if uint64(len(d.recordsBuffer)) >= d.config.BulkSize {
 		if err := d.Flush(ctx); err != nil {
@@ -110,8 +130,9 @@ func (d *Destination) Flush(ctx context.Context) error {
 		return err
 	}
 
+	// Ack results
 	for _, item := range response.Items {
-		var itemResponse bulkResponseItem
+		var itemResponse BulkResponseItem
 
 		switch {
 		case item.Update != nil:
@@ -142,27 +163,10 @@ func (d *Destination) Teardown(context.Context) error {
 	return nil // No close routine needed
 }
 
-func (d *Destination) writeDeleteOperation(key string, data *bytes.Buffer) error {
-	// actionAndMetadata
-	entryMetadata, err := json.Marshal(actionAndMetadata{
-		Delete: &deleteAction{
-			ID:    key,
-			Index: d.config.Index,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to prepare metadata with key=%s: %w", key, err)
-	}
-
-	data.Write(entryMetadata)
-	data.WriteRune('\n')
-	return nil
-}
-
 func (d *Destination) writeUpsertOperation(key string, data *bytes.Buffer, item sdk.Record) error {
-	// actionAndMetadata
-	entryMetadata, err := json.Marshal(actionAndMetadata{
-		Update: &updateAction{
+	// BulkRequestActionAndMetadata
+	entryMetadata, err := json.Marshal(BulkRequestActionAndMetadata{
+		Update: &BulkRequestUpdateAction{
 			ID:              key,
 			Index:           d.config.Index,
 			RetryOnConflict: 3,
@@ -175,8 +179,8 @@ func (d *Destination) writeUpsertOperation(key string, data *bytes.Buffer, item 
 	data.Write(entryMetadata)
 	data.WriteRune('\n')
 
-	// optionalSource
-	sourcePayload := optionalSource{
+	// BulkRequestOptionalSource
+	sourcePayload := BulkRequestOptionalSource{
 		DocAsUpsert: true,
 	}
 
@@ -205,50 +209,67 @@ func (d *Destination) writeUpsertOperation(key string, data *bytes.Buffer, item 
 	return nil
 }
 
-func (d *Destination) executeBulkRequest(ctx context.Context, data *bytes.Buffer) (bulkResponse, error) {
+func (d *Destination) writeDeleteOperation(key string, data *bytes.Buffer) error {
+	// BulkRequestActionAndMetadata
+	entryMetadata, err := json.Marshal(BulkRequestActionAndMetadata{
+		Delete: &BulkRequestDeleteAction{
+			ID:    key,
+			Index: d.config.Index,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to prepare metadata with key=%s: %w", key, err)
+	}
+
+	data.Write(entryMetadata)
+	data.WriteRune('\n')
+	return nil
+}
+
+func (d *Destination) executeBulkRequest(ctx context.Context, data *bytes.Buffer) (BulkResponse, error) {
 	if data.Len() < 1 {
 		sdk.Logger(ctx).Info().Msg("no operations to execute in bulk, skipping")
 
-		return bulkResponse{}, nil
+		return BulkResponse{}, nil
 	}
 
 	defer data.Reset()
 
 	result, err := d.client.Bulk(bytes.NewReader(data.Bytes()), d.client.Bulk.WithContext(ctx))
 	if err != nil {
-		return bulkResponse{}, fmt.Errorf("bulk request failure: %w", err)
+		return BulkResponse{}, fmt.Errorf("bulk request failure: %w", err)
 	}
 	if result.IsError() {
 		bodyContents, err := io.ReadAll(result.Body)
 		if err != nil {
-			return bulkResponse{}, fmt.Errorf("bulk request failure: failed to read the result: %w", err)
+			return BulkResponse{}, fmt.Errorf("bulk request failure: failed to read the result: %w", err)
 		}
 		defer result.Body.Close()
 
-		var errorDetails genericError
+		var errorDetails GenericError
 		if err := json.Unmarshal(bodyContents, &errorDetails); err != nil {
-			return bulkResponse{}, fmt.Errorf("bulk request failure: %s", result.Status())
+			return BulkResponse{}, fmt.Errorf("bulk request failure: %s", result.Status())
 		}
 
-		return bulkResponse{}, fmt.Errorf("bulk request failure: %s: %s", errorDetails.Error.Type, errorDetails.Error.Reason)
+		return BulkResponse{}, fmt.Errorf("bulk request failure: %s: %s", errorDetails.Error.Type, errorDetails.Error.Reason)
 	}
 
 	bodyContents, err := io.ReadAll(result.Body)
 	if err != nil {
-		return bulkResponse{}, fmt.Errorf("bulk response failure: failed to read the result: %w", err)
+		return BulkResponse{}, fmt.Errorf("bulk response failure: failed to read the result: %w", err)
 	}
 	defer result.Body.Close()
 
 	// Read individual errors
-	var response bulkResponse
+	var response BulkResponse
 	if err := json.Unmarshal(bodyContents, &response); err != nil {
-		return bulkResponse{}, fmt.Errorf("bulk response failure: could not read the response: %w", err)
+		return BulkResponse{}, fmt.Errorf("bulk response failure: could not read the response: %w", err)
 	}
 
 	return response, nil
 }
 
-func (d *Destination) sendAckForOperation(itemResponse bulkResponseItem) error {
+func (d *Destination) sendAckForOperation(itemResponse BulkResponseItem) error {
 	ackFunc, exists := d.ackFuncsBuffer[itemResponse.ID]
 	if !exists {
 		return fmt.Errorf("bulk response failure: could not ack item with key=%s: no ack function was registered", itemResponse.ID)
@@ -286,37 +307,37 @@ func (d *Destination) sendAckForOperation(itemResponse bulkResponseItem) error {
 	return nil
 }
 
-type actionAndMetadata struct {
-	Update *updateAction `json:"update,omitempty"`
-	Delete *deleteAction `json:"delete,omitempty"`
+type BulkRequestActionAndMetadata struct {
+	Update *BulkRequestUpdateAction `json:"update,omitempty"`
+	Delete *BulkRequestDeleteAction `json:"delete,omitempty"`
 }
 
-type updateAction struct {
+type BulkRequestUpdateAction struct {
 	ID              string `json:"_id"`
 	Index           string `json:"_index"`
 	RetryOnConflict int    `json:"retry_on_conflict"`
 }
 
-type deleteAction struct {
+type BulkRequestDeleteAction struct {
 	ID    string `json:"_id"`
 	Index string `json:"_index"`
 }
 
-type optionalSource struct {
+type BulkRequestOptionalSource struct {
 	Doc         json.RawMessage `json:"doc"`
 	DocAsUpsert bool            `json:"doc_as_upsert"`
 }
 
-type bulkResponse struct {
+type BulkResponse struct {
 	Took   int  `json:"took"`
 	Errors bool `json:"errors"`
 	Items  []struct {
-		Update *bulkResponseItem `json:"update,omitempty"`
-		Delete *bulkResponseItem `json:"delete,omitempty"`
+		Update *BulkResponseItem `json:"update,omitempty"`
+		Delete *BulkResponseItem `json:"delete,omitempty"`
 	} `json:"items"`
 }
 
-type bulkResponseItem struct {
+type BulkResponseItem struct {
 	Index   string `json:"_index"`
 	Type    string `json:"_type"`
 	ID      string `json:"_id"`
@@ -337,7 +358,7 @@ type bulkResponseItem struct {
 	} `json:"error,omitempty"`
 }
 
-type genericError struct {
+type GenericError struct {
 	Error struct {
 		Type   string `json:"type"`
 		Reason string `json:"reason"`
