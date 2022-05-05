@@ -17,38 +17,95 @@ package destination
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch"
 )
 
 const (
-	ConfigKeyHost     = "host"
-	ConfigKeyUsername = "username"
-	ConfigKeyPassword = "password"
-	ConfigKeyIndex    = "index"
-	ConfigKeyBulkSize = "bulkSize"
+	ConfigKeyVersion                = "version"
+	ConfigKeyHost                   = "host"
+	ConfigKeyUsername               = "username"
+	ConfigKeyPassword               = "password"
+	ConfigKeyCloudID                = "cloudId"
+	ConfigKeyAPIKey                 = "apiKey"
+	ConfigKeyServiceToken           = "serviceToken"
+	ConfigKeyCertificateFingerprint = "certificateFingerprint"
+	ConfigKeyIndex                  = "index"
+	ConfigKeyBulkSize               = "bulkSize"
 )
 
 type Config struct {
-	Host     string
-	Username string
-	Password string
-	Index    string
-	BulkSize uint64
+	Version                elasticsearch.Version
+	Host                   string
+	Username               string
+	Password               string
+	CloudID                string
+	APIKey                 string
+	ServiceToken           string
+	CertificateFingerprint string
+	Index                  string
+	BulkSize               uint64
+}
+
+func (c Config) GetHost() string {
+	return c.Host
+}
+
+func (c Config) GetUsername() string {
+	return c.Username
+}
+
+func (c Config) GetPassword() string {
+	return c.Password
+}
+
+func (c Config) GetCloudID() string {
+	return c.CloudID
+}
+
+func (c Config) GetAPIKey() string {
+	return c.APIKey
+}
+
+func (c Config) GetServiceToken() string {
+	return c.ServiceToken
+}
+
+func (c Config) GetCertificateFingerprint() string {
+	return c.CertificateFingerprint
 }
 
 func ParseConfig(cfgRaw map[string]string) (Config, error) {
 	cfg := Config{
-		Host:     cfgRaw[ConfigKeyHost],
-		Username: cfgRaw[ConfigKeyUsername],
-		Password: cfgRaw[ConfigKeyPassword],
-		Index:    cfgRaw[ConfigKeyIndex],
+		Version:                cfgRaw[ConfigKeyVersion],
+		Host:                   cfgRaw[ConfigKeyHost],
+		Username:               cfgRaw[ConfigKeyUsername],
+		Password:               cfgRaw[ConfigKeyPassword],
+		CloudID:                cfgRaw[ConfigKeyCloudID],
+		APIKey:                 cfgRaw[ConfigKeyAPIKey],
+		ServiceToken:           cfgRaw[ConfigKeyServiceToken],
+		CertificateFingerprint: cfgRaw[ConfigKeyCertificateFingerprint],
+		Index:                  cfgRaw[ConfigKeyIndex],
+	}
+
+	// if cfg.Version == "" {
+	// 	return Config{}, requiredConfigErr(ConfigKeyVersion)
+	// }
+	if cfg.Version == "" {
+		cfg.Version = elasticsearch.Version7
+	}
+	if cfg.Version != elasticsearch.Version7 && cfg.Version != elasticsearch.Version8 {
+		return Config{}, fmt.Errorf("%q config value must be one of [v7, v8], %s provided", ConfigKeyVersion, cfg.Version)
 	}
 
 	if cfg.Host == "" {
 		return Config{}, requiredConfigErr(ConfigKeyHost)
 	}
+
 	if cfg.Password == "" && cfg.Username != "" {
 		return Config{}, fmt.Errorf("%q config value must be set when %q is provided", ConfigKeyPassword, ConfigKeyUsername)
 	}
+
 	if cfg.Index == "" {
 		return Config{}, requiredConfigErr(ConfigKeyIndex)
 	}

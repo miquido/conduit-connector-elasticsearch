@@ -23,7 +23,7 @@ import (
 	"sync"
 
 	sdk "github.com/conduitio/conduit-connector-sdk"
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch"
 )
 
 func NewDestination() sdk.Destination {
@@ -34,7 +34,7 @@ type Destination struct {
 	sdk.UnimplementedDestination
 
 	config         Config
-	client         *elasticsearch.Client
+	client         elasticsearch.Client
 	mutex          sync.Mutex
 	recordsBuffer  []sdk.Record
 	ackFuncsBuffer map[string]sdk.AckFunc
@@ -48,22 +48,14 @@ func (d *Destination) Configure(_ context.Context, cfgRaw map[string]string) (er
 
 func (d *Destination) Open(ctx context.Context) (err error) {
 	// Initialize Elasticsearch client
-	d.client, err = elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{d.config.Host},
-		Username:  d.config.Username,
-		Password:  d.config.Password,
-	})
+	d.client, err = elasticsearch.NewClient(d.config.Version, d.config)
 	if err != nil {
 		return fmt.Errorf("connection could not be established: %w", err)
 	}
 
 	// Check the connection
-	ping, err := d.client.Ping(d.client.Ping.WithContext(ctx))
-	if err != nil {
+	if err := d.client.Ping(ctx); err != nil {
 		return fmt.Errorf("connection could not be established: %w", err)
-	}
-	if ping.IsError() {
-		return fmt.Errorf("connection could not be established: host ping failed: %s", ping.Status())
 	}
 
 	// Initializing the buffer
@@ -76,8 +68,12 @@ func (d *Destination) Open(ctx context.Context) (err error) {
 
 func (d *Destination) WriteAsync(ctx context.Context, record sdk.Record, ackFunc sdk.AckFunc) error {
 	key := string(record.Key.Bytes())
-	if err := ackFunc(fmt.Errorf("record Key is required")); err != nil {
-		return err
+	if key == "" {
+		if err := ackFunc(fmt.Errorf("record's Key is required")); err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	d.mutex.Lock()
@@ -107,7 +103,8 @@ func (d *Destination) Flush(ctx context.Context) error {
 		key := string(item.Key.Bytes())
 
 		switch action := item.Metadata["action"]; action {
-		case "created", "updated":
+		case "create", "created",
+			"update", "updated":
 			if err := d.writeUpsertOperation(key, data, item); err != nil {
 				return err
 			}
@@ -227,6 +224,7 @@ func (d *Destination) writeDeleteOperation(key string, data *bytes.Buffer) error
 }
 
 func (d *Destination) executeBulkRequest(ctx context.Context, data *bytes.Buffer) (BulkResponse, error) {
+	// Check if there is any job to do
 	if data.Len() < 1 {
 		sdk.Logger(ctx).Info().Msg("no operations to execute in bulk, skipping")
 
@@ -235,30 +233,18 @@ func (d *Destination) executeBulkRequest(ctx context.Context, data *bytes.Buffer
 
 	defer data.Reset()
 
-	result, err := d.client.Bulk(bytes.NewReader(data.Bytes()), d.client.Bulk.WithContext(ctx))
+	// Execute the request
+	responseBody, err := d.client.Bulk(ctx, bytes.NewReader(data.Bytes()))
 	if err != nil {
 		return BulkResponse{}, fmt.Errorf("bulk request failure: %w", err)
 	}
-	if result.IsError() {
-		bodyContents, err := io.ReadAll(result.Body)
-		if err != nil {
-			return BulkResponse{}, fmt.Errorf("bulk request failure: failed to read the result: %w", err)
-		}
-		defer result.Body.Close()
 
-		var errorDetails GenericError
-		if err := json.Unmarshal(bodyContents, &errorDetails); err != nil {
-			return BulkResponse{}, fmt.Errorf("bulk request failure: %s", result.Status())
-		}
-
-		return BulkResponse{}, fmt.Errorf("bulk request failure: %s: %s", errorDetails.Error.Type, errorDetails.Error.Reason)
-	}
-
-	bodyContents, err := io.ReadAll(result.Body)
+	// Get the response
+	bodyContents, err := io.ReadAll(responseBody)
 	if err != nil {
 		return BulkResponse{}, fmt.Errorf("bulk response failure: failed to read the result: %w", err)
 	}
-	defer result.Body.Close()
+	defer responseBody.Close()
 
 	// Read individual errors
 	var response BulkResponse
@@ -356,11 +342,4 @@ type BulkResponseItem struct {
 		Reason   string          `json:"reason"`
 		CausedBy json.RawMessage `json:"caused_by"`
 	} `json:"error,omitempty"`
-}
-
-type GenericError struct {
-	Error struct {
-		Type   string `json:"type"`
-		Reason string `json:"reason"`
-	} `json:"error"`
 }

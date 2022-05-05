@@ -25,6 +25,11 @@ func Specification() sdk.Specification {
 		Version: "v0.1.0",
 		Author:  "Miquido",
 		DestinationParams: map[string]sdk.Parameter{
+			"version": {
+				Default:     "",
+				Required:    false,
+				Description: "The version of the Elasticsearch service.",
+			},
 			"host": {
 				Default:     "",
 				Required:    true,
@@ -39,6 +44,26 @@ func Specification() sdk.Specification {
 				Default:     "",
 				Required:    false,
 				Description: "The password for HTTP Basic Authentication.",
+			},
+			"cloudId": {
+				Default:     "",
+				Required:    false,
+				Description: "Endpoint for the Elastic Service (https://elastic.co/cloud).",
+			},
+			"apiKey": {
+				Default:     "",
+				Required:    false,
+				Description: "Base64-encoded token for authorization; if set, overrides username/password and service token.",
+			},
+			"serviceToken": {
+				Default:     "",
+				Required:    false,
+				Description: "Service token for authorization; if set, overrides username/password.",
+			},
+			"certificateFingerprint": {
+				Default:     "",
+				Required:    false,
+				Description: "SHA256 hex fingerprint given by Elasticsearch on first launch.",
 			},
 			"index": {
 				Default:     "",
