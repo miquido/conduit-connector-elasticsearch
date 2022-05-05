@@ -17,18 +17,18 @@ The Destination connector stores data in given index.
 
 ## Configuration Options
 
-| name                     | description                                                                                    | required | default |
-|--------------------------|------------------------------------------------------------------------------------------------|----------|---------|
-| `version`                | The version of the Elasticsearch service. One of: `7`, `8`.                                    | true     |         |
-| `host`                   | Server host.                                                                                   | true     |         |
-| `username`               | The username used to authenticate.                                                             | false    |         |
-| `password`               | The password used to authenticate. Required when username was provided.                        | false    |         |
-| `cloudId`                | Endpoint for the Elastic Service (https://elastic.co/cloud).                                   | false    |         |
-| `apiKey`                 | Base64-encoded token for authorization; if set, overrides username/password and service token. | false    |         |
-| `serviceToken`           | Service token for authorization; if set, overrides username/password.                          | false    |         |
-| `certificateFingerprint` | SHA256 hex fingerprint given by Elasticsearch on first launch.                                 | false    |         |
-| `index`                  | The name of the target index.                                                                  | true     |         |
-| `bulkSize`               | The number of items stored in bulk in the index.                                               | true     | `1000`  |
+| name                     | description                                                                                                 | required | default |
+|--------------------------|-------------------------------------------------------------------------------------------------------------|----------|---------|
+| `version`                | The version of the Elasticsearch service. One of: `7`, `8`.                                                 | true     |         |
+| `host`                   | Server host.                                                                                                | true     |         |
+| `username`               | [v: 6, 7, 8] The username used to authenticate.                                                             | false    |         |
+| `password`               | [v: 6, 7, 8] The password used to authenticate. Required when username was provided.                        | false    |         |
+| `cloudId`                | [v: 6, 7, 8] Endpoint for the Elastic Service (https://elastic.co/cloud).                                   | false    |         |
+| `apiKey`                 | [v: 6, 7, 8] Base64-encoded token for authorization; if set, overrides username/password and service token. | false    |         |
+| `serviceToken`           | [v: 7, 8] Service token for authorization; if set, overrides username/password.                             | false    |         |
+| `certificateFingerprint` | [v: 7, 8] SHA256 hex fingerprint given by Elasticsearch on first launch.                                    | false    |         |
+| `index`                  | The name of the target index.                                                                               | true     |         |
+| `bulkSize`               | The number of items stored in bulk in the index.                                                            | true     | `1000`  |
 
 # Testing
 
