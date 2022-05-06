@@ -97,18 +97,30 @@ func ParseConfig(cfgRaw map[string]string) (Config, error) {
 	if cfg.Version == "" {
 		cfg.Version = elasticsearch.Version7
 	}
+
 	if cfg.Version != elasticsearch.Version6 &&
 		cfg.Version != elasticsearch.Version7 &&
 		cfg.Version != elasticsearch.Version8 {
-		return Config{}, fmt.Errorf("%q config value must be one of [v7, v8], %s provided", ConfigKeyVersion, cfg.Version)
+		return Config{}, fmt.Errorf(
+			"%q config value must be one of [%s, %s, %s], %s provided",
+			elasticsearch.Version6,
+			elasticsearch.Version7,
+			elasticsearch.Version8,
+			ConfigKeyVersion,
+			cfg.Version,
+		)
 	}
 
 	if cfg.Host == "" {
 		return Config{}, requiredConfigErr(ConfigKeyHost)
 	}
 
-	if cfg.Password == "" && cfg.Username != "" {
+	if cfg.Username != "" && cfg.Password == "" {
 		return Config{}, fmt.Errorf("%q config value must be set when %q is provided", ConfigKeyPassword, ConfigKeyUsername)
+	}
+
+	if cfg.Username == "" && cfg.Password != "" {
+		return Config{}, fmt.Errorf("%q config value must be set when %q is provided", ConfigKeyUsername, ConfigKeyPassword)
 	}
 
 	if cfg.Index == "" {
@@ -141,10 +153,10 @@ func parseBulkSizeConfigValue(cfgRaw map[string]string) (uint64, error) {
 
 	bulkSizeParsed, err := strconv.ParseUint(bulkSize, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse bulkSize config value: %w", err)
+		return 0, fmt.Errorf("failed to parse %q config value: %w", ConfigKeyBulkSize, err)
 	}
 	if bulkSizeParsed <= 0 {
-		return 0, fmt.Errorf("failed to parse bulkSize config value: value must be greated than 0")
+		return 0, fmt.Errorf("failed to parse %q config value: value must be greated than 0", ConfigKeyBulkSize)
 	}
 
 	return bulkSizeParsed, nil

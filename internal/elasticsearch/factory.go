@@ -30,18 +30,24 @@ const (
 	Version8 Version = "8"
 )
 
+var (
+	v6ClientBuilder = v6.NewClient
+	v7ClientBuilder = v7.NewClient
+	v8ClientBuilder = v8.NewClient
+)
+
 // NewClient creates new Elasticsearch client which supports given server version.
 // Returns error when provided version is unsupported or client initialization failed.
 func NewClient(version Version, config interface{}) (Client, error) {
 	switch version {
 	case Version6:
-		return v6.NewClient(config)
+		return v6ClientBuilder(config)
 
 	case Version7:
-		return v7.NewClient(config)
+		return v7ClientBuilder(config)
 
 	case Version8:
-		return v8.NewClient(config)
+		return v8ClientBuilder(config)
 
 	default:
 		return nil, fmt.Errorf("unsupported version: %s", version)
