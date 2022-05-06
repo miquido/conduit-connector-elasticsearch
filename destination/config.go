@@ -91,13 +91,9 @@ func ParseConfig(cfgRaw map[string]string) (Config, error) {
 		Type:                   cfgRaw[ConfigKeyType],
 	}
 
-	// if cfg.Version == "" {
-	// 	return Config{}, requiredConfigErr(ConfigKeyVersion)
-	// }
 	if cfg.Version == "" {
-		cfg.Version = elasticsearch.Version7
+		return Config{}, requiredConfigErr(ConfigKeyVersion)
 	}
-
 	if cfg.Version != elasticsearch.Version6 &&
 		cfg.Version != elasticsearch.Version7 &&
 		cfg.Version != elasticsearch.Version8 {
