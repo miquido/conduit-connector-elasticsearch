@@ -50,6 +50,10 @@ type Client struct {
 	es *elasticsearch.Client
 }
 
+func (c *Client) GetClient() *elasticsearch.Client {
+	return c.es
+}
+
 func (c *Client) Ping(ctx context.Context) error {
 	ping, err := c.es.Ping(c.es.Ping.WithContext(ctx))
 	if err != nil {

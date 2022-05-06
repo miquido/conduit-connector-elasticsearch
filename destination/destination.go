@@ -40,6 +40,10 @@ type Destination struct {
 	ackFuncsBuffer map[string]sdk.AckFunc
 }
 
+func (d *Destination) GetClient() elasticsearch.Client {
+	return d.client
+}
+
 func (d *Destination) Configure(_ context.Context, cfgRaw map[string]string) (err error) {
 	d.config, err = ParseConfig(cfgRaw)
 
@@ -109,7 +113,7 @@ func (d *Destination) Flush(ctx context.Context) error {
 				return err
 			}
 
-		case "deleted":
+		case "delete", "deleted":
 			if err := d.writeDeleteOperation(key, data); err != nil {
 				return err
 			}
