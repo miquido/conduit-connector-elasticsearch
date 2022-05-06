@@ -70,6 +70,11 @@ func Specification() sdk.Specification {
 				Required:    true,
 				Description: "The name of the index to write the data to.",
 			},
+			"type": {
+				Default:     "",
+				Required:    false,
+				Description: "The name of the index's type to write the data to. Required when version is 6.",
+			},
 			"bulkSize": {
 				Default:     "1000",
 				Required:    true,

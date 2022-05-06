@@ -31,6 +31,7 @@ const (
 	ConfigKeyServiceToken           = "serviceToken"
 	ConfigKeyCertificateFingerprint = "certificateFingerprint"
 	ConfigKeyIndex                  = "index"
+	ConfigKeyType                   = "type"
 	ConfigKeyBulkSize               = "bulkSize"
 )
 
@@ -44,6 +45,7 @@ type Config struct {
 	ServiceToken           string
 	CertificateFingerprint string
 	Index                  string
+	Type                   string
 	BulkSize               uint64
 }
 
@@ -86,6 +88,7 @@ func ParseConfig(cfgRaw map[string]string) (Config, error) {
 		ServiceToken:           cfgRaw[ConfigKeyServiceToken],
 		CertificateFingerprint: cfgRaw[ConfigKeyCertificateFingerprint],
 		Index:                  cfgRaw[ConfigKeyIndex],
+		Type:                   cfgRaw[ConfigKeyType],
 	}
 
 	// if cfg.Version == "" {
@@ -94,7 +97,9 @@ func ParseConfig(cfgRaw map[string]string) (Config, error) {
 	if cfg.Version == "" {
 		cfg.Version = elasticsearch.Version7
 	}
-	if cfg.Version != elasticsearch.Version7 && cfg.Version != elasticsearch.Version8 {
+	if cfg.Version != elasticsearch.Version6 &&
+		cfg.Version != elasticsearch.Version7 &&
+		cfg.Version != elasticsearch.Version8 {
 		return Config{}, fmt.Errorf("%q config value must be one of [v7, v8], %s provided", ConfigKeyVersion, cfg.Version)
 	}
 
@@ -108,6 +113,10 @@ func ParseConfig(cfgRaw map[string]string) (Config, error) {
 
 	if cfg.Index == "" {
 		return Config{}, requiredConfigErr(ConfigKeyIndex)
+	}
+
+	if cfg.Version == elasticsearch.Version6 && cfg.Type == "" {
+		return Config{}, requiredConfigErr(ConfigKeyType)
 	}
 
 	bulkSizeParsed, err := parseBulkSizeConfigValue(cfgRaw)

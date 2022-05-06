@@ -1,0 +1,23 @@
+version: '3.9'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.3
+    environment:
+      node.name: 'elasticsearch-v7'
+      cluster.name: 'es-v7-docker-cluster'
+      cluster.initial_master_nodes: 'elasticsearch-v7'
+      bootstrap.memory_lock: 'true'
+      ES_JAVA_OPTS: '-Xms512m -Xmx512m'
+    mem_limit: ${MEM_LIMIT:-1073741824}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - '${ELASTICSEARCH_PORT:-9200}:9200'
+    volumes:
+      - 'es_data:/usr/share/elasticsearch/data'
+
+volumes:
+  es_data: { }

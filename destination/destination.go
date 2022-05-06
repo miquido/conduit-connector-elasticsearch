@@ -162,12 +162,18 @@ func (d *Destination) Teardown(context.Context) error {
 
 func (d *Destination) writeUpsertOperation(key string, data *bytes.Buffer, item sdk.Record) error {
 	// BulkRequestActionAndMetadata
+	bulkRequestUpdateAction := BulkRequestUpdateAction{
+		ID:              key,
+		Index:           d.config.Index,
+		RetryOnConflict: 3,
+	}
+
+	if d.config.Version == elasticsearch.Version6 {
+		bulkRequestUpdateAction.Type = &d.config.Type
+	}
+
 	entryMetadata, err := json.Marshal(BulkRequestActionAndMetadata{
-		Update: &BulkRequestUpdateAction{
-			ID:              key,
-			Index:           d.config.Index,
-			RetryOnConflict: 3,
-		},
+		Update: &bulkRequestUpdateAction,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to prepare metadata with key=%s: %w", key, err)
@@ -208,11 +214,17 @@ func (d *Destination) writeUpsertOperation(key string, data *bytes.Buffer, item 
 
 func (d *Destination) writeDeleteOperation(key string, data *bytes.Buffer) error {
 	// BulkRequestActionAndMetadata
+	bulkRequestDeleteAction := BulkRequestDeleteAction{
+		ID:    key,
+		Index: d.config.Index,
+	}
+
+	if d.config.Version == elasticsearch.Version6 {
+		bulkRequestDeleteAction.Type = &d.config.Type
+	}
+
 	entryMetadata, err := json.Marshal(BulkRequestActionAndMetadata{
-		Delete: &BulkRequestDeleteAction{
-			ID:    key,
-			Index: d.config.Index,
-		},
+		Delete: &bulkRequestDeleteAction,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to prepare metadata with key=%s: %w", key, err)
@@ -220,6 +232,7 @@ func (d *Destination) writeDeleteOperation(key string, data *bytes.Buffer) error
 
 	data.Write(entryMetadata)
 	data.WriteRune('\n')
+
 	return nil
 }
 
@@ -299,14 +312,16 @@ type BulkRequestActionAndMetadata struct {
 }
 
 type BulkRequestUpdateAction struct {
-	ID              string `json:"_id"`
-	Index           string `json:"_index"`
-	RetryOnConflict int    `json:"retry_on_conflict"`
+	ID              string  `json:"_id"`
+	Index           string  `json:"_index"`
+	Type            *string `json:"_type"`
+	RetryOnConflict int     `json:"retry_on_conflict"`
 }
 
 type BulkRequestDeleteAction struct {
-	ID    string `json:"_id"`
-	Index string `json:"_index"`
+	ID    string  `json:"_id"`
+	Index string  `json:"_index"`
+	Type  *string `json:"_type"`
 }
 
 type BulkRequestOptionalSource struct {
