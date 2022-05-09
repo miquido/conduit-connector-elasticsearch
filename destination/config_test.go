@@ -27,8 +27,6 @@ func TestParseConfig(t *testing.T) {
 	fakerInstance := faker.New()
 
 	t.Run("fails when Version is empty", func(t *testing.T) {
-		t.SkipNow()
-
 		_, err := ParseConfig(map[string]string{
 			"nonExistentKey": "value",
 		})
@@ -142,7 +140,19 @@ func TestParseConfig(t *testing.T) {
 			"nonExistentKey":  "value",
 		})
 
-		require.EqualError(t, err, fmt.Sprintf("failed to parse %q config value: value must be greated than 0", ConfigKeyBulkSize))
+		require.EqualError(t, err, fmt.Sprintf("failed to parse %q config value: value must be greater than 0", ConfigKeyBulkSize))
+	})
+
+	t.Run("fails when Bulk Size is greater than 10 000", func(t *testing.T) {
+		_, err := ParseConfig(map[string]string{
+			ConfigKeyVersion:  elasticsearch.Version8,
+			ConfigKeyHost:     fakerInstance.Internet().URL(),
+			ConfigKeyIndex:    fakerInstance.Lorem().Word(),
+			ConfigKeyBulkSize: "10001",
+			"nonExistentKey":  "value",
+		})
+
+		require.EqualError(t, err, fmt.Sprintf("failed to parse %q config value: value must be less than 10 000", ConfigKeyBulkSize))
 	})
 
 	t.Run("returns config when all required config values were provided", func(t *testing.T) {
@@ -176,7 +186,7 @@ func TestParseConfig(t *testing.T) {
 			ConfigKeyHost:                   fakerInstance.Internet().URL(),
 			ConfigKeyIndex:                  fakerInstance.Lorem().Word(),
 			ConfigKeyType:                   fakerInstance.Lorem().Word(),
-			ConfigKeyBulkSize:               fmt.Sprintf("%d", fakerInstance.Int32Between(1, 999999)),
+			ConfigKeyBulkSize:               fmt.Sprintf("%d", fakerInstance.Int32Between(1, 10_000)),
 			ConfigKeyUsername:               fakerInstance.Internet().Email(),
 			ConfigKeyPassword:               fakerInstance.Internet().Password(),
 			ConfigKeyCloudID:                fakerInstance.RandomStringWithLength(32),

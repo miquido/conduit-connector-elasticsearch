@@ -152,7 +152,10 @@ func parseBulkSizeConfigValue(cfgRaw map[string]string) (uint64, error) {
 		return 0, fmt.Errorf("failed to parse %q config value: %w", ConfigKeyBulkSize, err)
 	}
 	if bulkSizeParsed <= 0 {
-		return 0, fmt.Errorf("failed to parse %q config value: value must be greated than 0", ConfigKeyBulkSize)
+		return 0, fmt.Errorf("failed to parse %q config value: value must be greater than 0", ConfigKeyBulkSize)
+	}
+	if bulkSizeParsed > 10_000 {
+		return 0, fmt.Errorf("failed to parse %q config value: value must be less than 10 000", ConfigKeyBulkSize)
 	}
 
 	return bulkSizeParsed, nil
