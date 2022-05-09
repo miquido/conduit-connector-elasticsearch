@@ -43,11 +43,12 @@ func TestParseConfig(t *testing.T) {
 		})
 
 		require.EqualError(t, err, fmt.Sprintf(
-			"%q config value must be one of [%s, %s, %s], %s provided",
+			"%q config value must be one of [%s, %s, %s, %s], %s provided",
+			ConfigKeyVersion,
+			elasticsearch.Version5,
 			elasticsearch.Version6,
 			elasticsearch.Version7,
 			elasticsearch.Version8,
-			ConfigKeyVersion,
 			version,
 		))
 	})

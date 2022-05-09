@@ -8,6 +8,12 @@ test:
 	# Tests that does not require Docker services to be running
 	go test -race $(go list ./... | grep -Fv '/test/v')
 
+	# Elasticsearch v5
+	docker compose -f test/docker-compose.v5.yml -p test-v5 up --quiet-pull -d --wait
+	go test $(GOTEST_FLAGS) -race ./test/v5; ret=$$?; \
+	  	docker compose -f test/docker-compose.v5.yml -p test-v5 down; \
+	  	if [ $$ret -ne 0 ]; then exit $$ret; fi
+
 	# Elasticsearch v6
 	docker compose -f test/docker-compose.v6.yml -p test-v6 up --quiet-pull -d --wait
 	go test $(GOTEST_FLAGS) -race ./test/v6; ret=$$?; \

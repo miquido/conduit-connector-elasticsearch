@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v7
+package v5
 
 import (
 	"bytes"
@@ -20,15 +20,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"testing"
 	"time"
 
 	sdk "github.com/conduitio/conduit-connector-sdk"
-	esV7 "github.com/elastic/go-elasticsearch/v7"
+	esV5 "github.com/elastic/go-elasticsearch/v5"
 	"github.com/jaswdr/faker"
 	"github.com/miquido/conduit-connector-elasticsearch/destination"
 	"github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch"
-	v7 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v7"
+	v5 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,16 +38,17 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 	dest := destination.NewDestination().(*destination.Destination)
 
 	cfgRaw := map[string]string{
-		destination.ConfigKeyVersion:  elasticsearch.Version7,
+		destination.ConfigKeyVersion:  elasticsearch.Version5,
 		destination.ConfigKeyHost:     "http://127.0.0.1:9200",
 		destination.ConfigKeyIndex:    "users",
+		destination.ConfigKeyType:     "user",
 		destination.ConfigKeyBulkSize: "1",
 	}
 
 	require.NoError(t, dest.Configure(context.Background(), cfgRaw))
 	require.NoError(t, dest.Open(context.Background()))
 
-	esClient := dest.GetClient().(*v7.Client).GetClient()
+	esClient := dest.GetClient().(*v5.Client).GetClient()
 
 	require.True(t, assertIndexIsDeleted(esClient, "users"))
 
@@ -118,16 +120,17 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 	dest := destination.NewDestination().(*destination.Destination)
 
 	cfgRaw := map[string]string{
-		destination.ConfigKeyVersion:  elasticsearch.Version7,
+		destination.ConfigKeyVersion:  elasticsearch.Version5,
 		destination.ConfigKeyHost:     "http://127.0.0.1:9200",
 		destination.ConfigKeyIndex:    "users",
+		destination.ConfigKeyType:     "user",
 		destination.ConfigKeyBulkSize: "3",
 	}
 
 	require.NoError(t, dest.Configure(context.Background(), cfgRaw))
 	require.NoError(t, dest.Open(context.Background()))
 
-	esClient := dest.GetClient().(*v7.Client).GetClient()
+	esClient := dest.GetClient().(*v5.Client).GetClient()
 
 	require.True(t, assertIndexIsDeleted(esClient, "users"))
 
@@ -254,8 +257,19 @@ func ackFunc(t *testing.T) sdk.AckFunc {
 	}
 }
 
-func assertIndexIsDeleted(esClient *esV7.Client, index string) bool {
-	res, err := esClient.Indices.Delete([]string{index}, esClient.Indices.Delete.WithIgnoreUnavailable(true))
+func assertIndexIsDeleted(esClient *esV5.Client, index string) bool {
+	existsResponse, err := esClient.Indices.Exists([]string{index})
+	if err != nil {
+		log.Fatalf("Cannot check if index %q exists: %s", index, err)
+
+		return false
+	}
+
+	if existsResponse.StatusCode == http.StatusNotFound {
+		return true
+	}
+
+	res, err := esClient.Indices.Delete([]string{index})
 	if err != nil || res.IsError() {
 		log.Fatalf("Cannot delete index %q: %s", index, err)
 
@@ -265,7 +279,7 @@ func assertIndexIsDeleted(esClient *esV7.Client, index string) bool {
 	return true
 }
 
-func assertIndexContainsDocuments(t *testing.T, esClient *esV7.Client, documents []map[string]interface{}) error {
+func assertIndexContainsDocuments(t *testing.T, esClient *esV5.Client, documents []map[string]interface{}) error {
 	// Build the request body.
 	var buf bytes.Buffer
 	query := map[string]interface{}{
@@ -288,6 +302,7 @@ func assertIndexContainsDocuments(t *testing.T, esClient *esV7.Client, documents
 	// Search
 	response, err := esClient.Search(
 		esClient.Search.WithIndex("users"),
+		esClient.Search.WithDocumentType("user"),
 		esClient.Search.WithBody(&buf),
 	)
 	if err != nil {
@@ -318,9 +333,8 @@ func assertIndexContainsDocuments(t *testing.T, esClient *esV7.Client, documents
 	}
 
 	hitsMetadata := r["hits"].(map[string]interface{})
-	totalMetadata := hitsMetadata["total"].(map[string]interface{})
 
-	require.Equal(t, len(documents), int(totalMetadata["value"].(float64)))
+	require.Equal(t, len(documents), int(hitsMetadata["total"].(float64)))
 
 	hits := hitsMetadata["hits"].([]interface{})
 

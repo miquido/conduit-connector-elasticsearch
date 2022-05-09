@@ -17,6 +17,7 @@ package elasticsearch
 import (
 	"fmt"
 
+	v5 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v5"
 	v6 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v6"
 	v7 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v7"
 	v8 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v8"
@@ -25,12 +26,14 @@ import (
 type Version = string
 
 const (
+	Version5 Version = "5"
 	Version6 Version = "6"
 	Version7 Version = "7"
 	Version8 Version = "8"
 )
 
 var (
+	v5ClientBuilder = v5.NewClient
 	v6ClientBuilder = v6.NewClient
 	v7ClientBuilder = v7.NewClient
 	v8ClientBuilder = v8.NewClient
@@ -40,6 +43,9 @@ var (
 // Returns error when provided version is unsupported or client initialization failed.
 func NewClient(version Version, config interface{}) (Client, error) {
 	switch version {
+	case Version5:
+		return v5ClientBuilder(config)
+
 	case Version6:
 		return v6ClientBuilder(config)
 

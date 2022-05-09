@@ -257,7 +257,7 @@ func ackFunc(t *testing.T) sdk.AckFunc {
 func assertIndexIsDeleted(esClient *esV8.Client, index string) bool {
 	res, err := esClient.Indices.Delete([]string{index}, esClient.Indices.Delete.WithIgnoreUnavailable(true))
 	if err != nil || res.IsError() {
-		log.Fatalf("Cannot delete index: %s", err)
+		log.Fatalf("Cannot delete index %q: %s", index, err)
 
 		return false
 	}

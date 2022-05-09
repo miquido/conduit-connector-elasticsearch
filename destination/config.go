@@ -17,6 +17,7 @@ package destination
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch"
 )
@@ -102,15 +103,19 @@ func ParseConfig(cfgRaw map[string]string) (Config, error) {
 	if cfg.Version == "" {
 		return Config{}, requiredConfigErr(ConfigKeyVersion)
 	}
-	if cfg.Version != elasticsearch.Version6 &&
+	if cfg.Version != elasticsearch.Version5 &&
+		cfg.Version != elasticsearch.Version6 &&
 		cfg.Version != elasticsearch.Version7 &&
 		cfg.Version != elasticsearch.Version8 {
 		return Config{}, fmt.Errorf(
-			"%q config value must be one of [%s, %s, %s], %s provided",
+			"%q config value must be one of [%s], %s provided",
 			ConfigKeyVersion,
-			elasticsearch.Version6,
-			elasticsearch.Version7,
-			elasticsearch.Version8,
+			strings.Join([]elasticsearch.Version{
+				elasticsearch.Version5,
+				elasticsearch.Version6,
+				elasticsearch.Version7,
+				elasticsearch.Version8,
+			}, ", "),
 			cfg.Version,
 		)
 	}

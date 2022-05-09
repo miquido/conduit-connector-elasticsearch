@@ -1,0 +1,29 @@
+version: '3.9'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.16
+    environment:
+      node.name: 'elasticsearch-v5'
+      cluster.name: 'es-v5-docker-cluster'
+      discovery.type: 'single-node'
+      bootstrap.memory_lock: 'true'
+      xpack.security.enabled: 'false'
+      ES_JAVA_OPTS: '-Xms512m -Xmx512m'
+    mem_limit: ${MEM_LIMIT:-1073741824}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://elasticsearch:9200" ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+    ports:
+      - '${ELASTICSEARCH_PORT:-9200}:9200'
+    volumes:
+      - 'es_data:/usr/share/elasticsearch/data'
+
+volumes:
+  es_data: { }

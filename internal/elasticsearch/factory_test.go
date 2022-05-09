@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/jaswdr/faker"
+	v5 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v5"
 	v6 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v6"
 	v7 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v7"
 	v8 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v8"
@@ -39,6 +40,26 @@ func TestNewClient(t *testing.T) {
 		_, err := NewClient(version, config)
 
 		require.EqualError(t, err, fmt.Sprintf("unsupported version: %s", version))
+	})
+
+	t.Run(fmt.Sprintf("Client for version %s can be created", Version5), func(t *testing.T) {
+		var (
+			config = map[string]interface{}{
+				fakerInstance.Lorem().Word(): fakerInstance.Int(),
+			}
+			clientMock = new(v5.Client)
+		)
+
+		v5ClientBuilder = func(cfg interface{}) (*v5.Client, error) {
+			require.Equal(t, config, cfg)
+
+			return clientMock, nil
+		}
+
+		client, err := NewClient(Version5, config)
+
+		require.NoError(t, err)
+		require.Same(t, clientMock, client)
 	})
 
 	t.Run(fmt.Sprintf("Client for version %s can be created", Version6), func(t *testing.T) {
