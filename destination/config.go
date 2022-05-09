@@ -99,10 +99,10 @@ func ParseConfig(cfgRaw map[string]string) (Config, error) {
 		cfg.Version != elasticsearch.Version8 {
 		return Config{}, fmt.Errorf(
 			"%q config value must be one of [%s, %s, %s], %s provided",
+			ConfigKeyVersion,
 			elasticsearch.Version6,
 			elasticsearch.Version7,
 			elasticsearch.Version8,
-			ConfigKeyVersion,
 			cfg.Version,
 		)
 	}
