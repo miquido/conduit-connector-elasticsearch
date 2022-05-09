@@ -14,12 +14,9 @@
 
 package v6
 
-type config interface {
-	GetHost() string
-	GetUsername() string
-	GetPassword() string
-	GetCloudID() string
-	GetAPIKey() string
-	GetIndex() string
-	GetType() string
+import "encoding/json"
+
+type bulkRequestOptionalSource struct {
+	Doc         json.RawMessage `json:"doc"`
+	DocAsUpsert bool            `json:"doc_as_upsert"`
 }

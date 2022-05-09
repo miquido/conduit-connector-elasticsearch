@@ -165,77 +165,40 @@ func (d *Destination) Teardown(context.Context) error {
 }
 
 func (d *Destination) writeUpsertOperation(key string, data *bytes.Buffer, item sdk.Record) error {
-	// BulkRequestActionAndMetadata
-	bulkRequestUpdateAction := BulkRequestUpdateAction{
-		ID:              key,
-		Index:           d.config.Index,
-		RetryOnConflict: 3,
-	}
+	jsonEncoder := json.NewEncoder(data)
 
-	if d.config.Version == elasticsearch.Version6 {
-		bulkRequestUpdateAction.Type = &d.config.Type
-	}
-
-	entryMetadata, err := json.Marshal(BulkRequestActionAndMetadata{
-		Update: &bulkRequestUpdateAction,
-	})
+	// Prepare data
+	metadata, sourcePayload, err := d.client.PrepareUpsertOperation(key, item)
 	if err != nil {
 		return fmt.Errorf("failed to prepare metadata with key=%s: %w", key, err)
 	}
 
-	data.Write(entryMetadata)
-	data.WriteRune('\n')
-
-	// BulkRequestOptionalSource
-	sourcePayload := BulkRequestOptionalSource{
-		DocAsUpsert: true,
+	// Write metadata
+	if err := jsonEncoder.Encode(metadata); err != nil {
+		return fmt.Errorf("failed to prepare metadata with key=%s: %w", key, err)
 	}
 
-	switch itemPayload := item.Payload.(type) {
-	case sdk.StructuredData:
-		// Payload is potentially convertable into JSON
-		itemPayloadMarshalled, err := json.Marshal(itemPayload)
-		if err != nil {
-			return fmt.Errorf("failed to prepare data with key=%s: %w", key, err)
-		}
-
-		sourcePayload.Doc = itemPayloadMarshalled
-
-	default:
-		// Nothing more can be done, we can trust the source to provide valid JSON
-		sourcePayload.Doc = itemPayload.Bytes()
-	}
-
-	entrySource, err := json.Marshal(sourcePayload)
-	if err != nil {
+	// Write payload
+	if err := jsonEncoder.Encode(sourcePayload); err != nil {
 		return fmt.Errorf("failed to prepare data with key=%s: %w", key, err)
 	}
 
-	data.Write(entrySource)
-	data.WriteRune('\n')
 	return nil
 }
 
 func (d *Destination) writeDeleteOperation(key string, data *bytes.Buffer) error {
-	// BulkRequestActionAndMetadata
-	bulkRequestDeleteAction := BulkRequestDeleteAction{
-		ID:    key,
-		Index: d.config.Index,
-	}
+	jsonEncoder := json.NewEncoder(data)
 
-	if d.config.Version == elasticsearch.Version6 {
-		bulkRequestDeleteAction.Type = &d.config.Type
-	}
-
-	entryMetadata, err := json.Marshal(BulkRequestActionAndMetadata{
-		Delete: &bulkRequestDeleteAction,
-	})
+	// Prepare data
+	metadata, err := d.client.PrepareDeleteOperation(key)
 	if err != nil {
 		return fmt.Errorf("failed to prepare metadata with key=%s: %w", key, err)
 	}
 
-	data.Write(entryMetadata)
-	data.WriteRune('\n')
+	// Write metadata
+	if err := jsonEncoder.Encode(metadata); err != nil {
+		return fmt.Errorf("failed to prepare metadata with key=%s: %w", key, err)
+	}
 
 	return nil
 }
@@ -311,8 +274,10 @@ func (d *Destination) sendAckForOperation(itemResponse BulkResponseItem) error {
 }
 
 type BulkRequestActionAndMetadata struct {
-	Update *BulkRequestUpdateAction `json:"update,omitempty"`
-	Delete *BulkRequestDeleteAction `json:"delete,omitempty"`
+	// Update *BulkRequestUpdateAction `json:"update,omitempty"`
+	// Delete *BulkRequestDeleteAction `json:"delete,omitempty"`
+	Update interface{} `json:"update,omitempty"`
+	Delete interface{} `json:"delete,omitempty"`
 }
 
 type BulkRequestUpdateAction struct {

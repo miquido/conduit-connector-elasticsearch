@@ -67,12 +67,6 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 		}
 	)
 
-	ackFunc := func(err error) error {
-		require.NoError(t, err)
-
-		return nil
-	}
-
 	t.Run("records can be upserted", func(t *testing.T) {
 		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 			Metadata: map[string]string{
@@ -81,7 +75,7 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 			Payload:   sdk.StructuredData(user1),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user1["id"])),
 			CreatedAt: time.Now(),
-		}, ackFunc))
+		}, ackFunc(t)))
 		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 			Metadata: map[string]string{
 				"action": "created",
@@ -89,7 +83,7 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 			Payload:   sdk.StructuredData(user2),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user2["id"])),
 			CreatedAt: time.Now(),
-		}, ackFunc))
+		}, ackFunc(t)))
 
 		// Give Elasticsearch enough time to persist operations
 		time.Sleep(time.Second)
@@ -108,7 +102,7 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 			Payload:   nil,
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user1["id"])),
 			CreatedAt: time.Now(),
-		}, ackFunc))
+		}, ackFunc(t)))
 
 		// Give Elasticsearch enough time to persist operations
 		time.Sleep(time.Second)
@@ -166,12 +160,6 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 		}
 	)
 
-	ackFunc := func(err error) error {
-		require.NoError(t, err)
-
-		return nil
-	}
-
 	t.Run("writing first 3 records does persists them", func(t *testing.T) {
 		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 			Metadata: map[string]string{
@@ -180,7 +168,7 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 			Payload:   sdk.StructuredData(user1),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user1["id"])),
 			CreatedAt: time.Now(),
-		}, ackFunc))
+		}, ackFunc(t)))
 		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 			Metadata: map[string]string{
 				"action": "created",
@@ -188,7 +176,7 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 			Payload:   sdk.StructuredData(user2),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user2["id"])),
 			CreatedAt: time.Now(),
-		}, ackFunc))
+		}, ackFunc(t)))
 		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 			Metadata: map[string]string{
 				"action": "created",
@@ -196,7 +184,7 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 			Payload:   sdk.StructuredData(user3),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user3["id"])),
 			CreatedAt: time.Now(),
-		}, ackFunc))
+		}, ackFunc(t)))
 
 		// Give Elasticsearch enough time to persist operations
 		time.Sleep(time.Second)
@@ -216,7 +204,7 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 			Payload:   sdk.StructuredData(user4),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user4["id"])),
 			CreatedAt: time.Now(),
-		}, ackFunc))
+		}, ackFunc(t)))
 		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 			Metadata: map[string]string{
 				"action": "created",
@@ -224,7 +212,7 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 			Payload:   sdk.StructuredData(user5),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user5["id"])),
 			CreatedAt: time.Now(),
-		}, ackFunc))
+		}, ackFunc(t)))
 
 		// Give Elasticsearch enough time to persist operations
 		time.Sleep(time.Second)
@@ -244,7 +232,7 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 			Payload:   sdk.StructuredData(user3),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user3["id"])),
 			CreatedAt: time.Now(),
-		}, ackFunc))
+		}, ackFunc(t)))
 
 		// Give Elasticsearch enough time to persist operations
 		time.Sleep(time.Second)
@@ -256,6 +244,14 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 			user5,
 		}))
 	})
+}
+
+func ackFunc(t *testing.T) sdk.AckFunc {
+	return func(err error) error {
+		require.NoError(t, err)
+
+		return nil
+	}
 }
 
 func assertIndexIsDeleted(esClient *esV7.Client, index string) bool {

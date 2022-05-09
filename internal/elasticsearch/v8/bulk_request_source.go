@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v6
+package v8
 
-type config interface {
-	GetHost() string
-	GetUsername() string
-	GetPassword() string
-	GetCloudID() string
-	GetAPIKey() string
-	GetIndex() string
-	GetType() string
+import "encoding/json"
+
+type bulkRequestOptionalSource struct {
+	Doc         json.RawMessage `json:"doc"`
+	DocAsUpsert bool            `json:"doc_as_upsert"`
 }

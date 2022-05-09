@@ -12,14 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v6
+package v7
 
-type config interface {
-	GetHost() string
-	GetUsername() string
-	GetPassword() string
-	GetCloudID() string
-	GetAPIKey() string
-	GetIndex() string
-	GetType() string
+type bulkRequestActionAndMetadata struct {
+	Update *bulkRequestUpdateAction `json:"update,omitempty"`
+	Delete *bulkRequestDeleteAction `json:"delete,omitempty"`
+}
+
+type bulkRequestUpdateAction struct {
+	ID              string `json:"_id"`
+	Index           string `json:"_index"`
+	RetryOnConflict int    `json:"retry_on_conflict"`
+}
+
+type bulkRequestDeleteAction struct {
+	ID    string `json:"_id"`
+	Index string `json:"_index"`
 }

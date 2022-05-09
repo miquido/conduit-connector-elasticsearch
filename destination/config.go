@@ -77,6 +77,14 @@ func (c Config) GetCertificateFingerprint() string {
 	return c.CertificateFingerprint
 }
 
+func (c Config) GetIndex() string {
+	return c.Index
+}
+
+func (c Config) GetType() string {
+	return c.Type
+}
+
 func ParseConfig(cfgRaw map[string]string) (Config, error) {
 	cfg := Config{
 		Version:                cfgRaw[ConfigKeyVersion],

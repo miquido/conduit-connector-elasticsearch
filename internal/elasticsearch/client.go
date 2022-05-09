@@ -17,6 +17,8 @@ package elasticsearch
 import (
 	"context"
 	"io"
+
+	sdk "github.com/conduitio/conduit-connector-sdk"
 )
 
 // Client describes Elasticsearch client interface
@@ -28,4 +30,10 @@ type Client interface {
 	// Bulk executes Elasticsearch Bulk API request.
 	// See: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 	Bulk(ctx context.Context, reader io.Reader) (io.ReadCloser, error)
+
+	// PrepareUpsertOperation prepares upsert operation definition
+	PrepareUpsertOperation(key string, item sdk.Record) (metadata interface{}, payload interface{}, err error)
+
+	// PrepareDeleteOperation prepares delete operation definition
+	PrepareDeleteOperation(key string) (metadata interface{}, err error)
 }

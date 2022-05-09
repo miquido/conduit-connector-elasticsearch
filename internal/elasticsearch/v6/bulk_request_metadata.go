@@ -14,12 +14,20 @@
 
 package v6
 
-type config interface {
-	GetHost() string
-	GetUsername() string
-	GetPassword() string
-	GetCloudID() string
-	GetAPIKey() string
-	GetIndex() string
-	GetType() string
+type bulkRequestActionAndMetadata struct {
+	Update *bulkRequestUpdateAction `json:"update,omitempty"`
+	Delete *bulkRequestDeleteAction `json:"delete,omitempty"`
+}
+
+type bulkRequestUpdateAction struct {
+	ID              string `json:"_id"`
+	Index           string `json:"_index"`
+	Type            string `json:"_type"`
+	RetryOnConflict int    `json:"retry_on_conflict"`
+}
+
+type bulkRequestDeleteAction struct {
+	ID    string `json:"_id"`
+	Index string `json:"_index"`
+	Type  string `json:"_type"`
 }

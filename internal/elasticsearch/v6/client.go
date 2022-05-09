@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 
+	sdk "github.com/conduitio/conduit-connector-sdk"
 	"github.com/elastic/go-elasticsearch/v6"
 )
 
@@ -42,12 +43,14 @@ func NewClient(cfg interface{}) (*Client, error) {
 	}
 
 	return &Client{
-		es: esClient,
+		es:  esClient,
+		cfg: configTyped,
 	}, nil
 }
 
 type Client struct {
-	es *elasticsearch.Client
+	es  *elasticsearch.Client
+	cfg config
 }
 
 func (c *Client) GetClient() *elasticsearch.Client {
@@ -88,4 +91,49 @@ func (c *Client) Bulk(ctx context.Context, reader io.Reader) (io.ReadCloser, err
 	}
 
 	return result.Body, nil
+}
+
+func (c *Client) PrepareUpsertOperation(key string, item sdk.Record) (interface{}, interface{}, error) {
+	// Prepare metadata
+	metadata := bulkRequestActionAndMetadata{
+		Update: &bulkRequestUpdateAction{
+			ID:              key,
+			Index:           c.cfg.GetIndex(),
+			Type:            c.cfg.GetType(),
+			RetryOnConflict: 3,
+		},
+	}
+
+	// Prepare payload
+	payload := bulkRequestOptionalSource{
+		Doc:         nil,
+		DocAsUpsert: true,
+	}
+
+	switch itemPayload := item.Payload.(type) {
+	case sdk.StructuredData:
+		var err error
+
+		// Payload is potentially convertable into JSON
+		payload.Doc, err = json.Marshal(itemPayload)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to prepare data with key=%s: %w", key, err)
+		}
+
+	default:
+		// Nothing more can be done, we can trust the source to provide valid JSON
+		payload.Doc = itemPayload.Bytes()
+	}
+
+	return metadata, payload, nil
+}
+
+func (c *Client) PrepareDeleteOperation(key string) (interface{}, error) {
+	return bulkRequestActionAndMetadata{
+		Delete: &bulkRequestDeleteAction{
+			ID:    key,
+			Index: c.cfg.GetIndex(),
+			Type:  c.cfg.GetType(),
+		},
+	}, nil
 }

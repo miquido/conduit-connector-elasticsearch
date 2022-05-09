@@ -22,4 +22,5 @@ type config interface {
 	GetAPIKey() string
 	GetServiceToken() string
 	GetCertificateFingerprint() string
+	GetIndex() string
 }
