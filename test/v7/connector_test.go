@@ -37,10 +37,9 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 	dest := destination.NewDestination().(*destination.Destination)
 
 	cfgRaw := map[string]string{
-		destination.ConfigKeyVersion:  elasticsearch.Version7,
-		destination.ConfigKeyHost:     "http://127.0.0.1:9200",
-		destination.ConfigKeyIndex:    "users",
-		destination.ConfigKeyBulkSize: "1",
+		destination.ConfigKeyVersion:       elasticsearch.Version7,
+		destination.ConfigKeyConnectionURI: "http://127.0.0.1:9200/users",
+		destination.ConfigKeyBulkSize:      "1",
 	}
 
 	require.NoError(t, dest.Configure(context.Background(), cfgRaw))
@@ -118,10 +117,9 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 	dest := destination.NewDestination().(*destination.Destination)
 
 	cfgRaw := map[string]string{
-		destination.ConfigKeyVersion:  elasticsearch.Version7,
-		destination.ConfigKeyHost:     "http://127.0.0.1:9200",
-		destination.ConfigKeyIndex:    "users",
-		destination.ConfigKeyBulkSize: "3",
+		destination.ConfigKeyVersion:       elasticsearch.Version7,
+		destination.ConfigKeyConnectionURI: "http://127.0.0.1:9200/users",
+		destination.ConfigKeyBulkSize:      "3",
 	}
 
 	require.NoError(t, dest.Configure(context.Background(), cfgRaw))

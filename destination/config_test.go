@@ -53,68 +53,76 @@ func TestParseConfig(t *testing.T) {
 		))
 	})
 
+	t.Run("fails when connection URI is empty", func(t *testing.T) {
+		_, err := ParseConfig(map[string]string{
+			ConfigKeyVersion:       elasticsearch.Version8,
+			ConfigKeyConnectionURI: "",
+			"nonExistentKey":       "value",
+		})
+
+		require.EqualError(t, err, fmt.Sprintf(`%q config value must be set`, ConfigKeyConnectionURI))
+	})
+
+	t.Run("fails when connection URI has invalid format", func(t *testing.T) {
+		_, err := ParseConfig(map[string]string{
+			ConfigKeyVersion:       elasticsearch.Version8,
+			ConfigKeyConnectionURI: "https://Username:Password@example.com:port",
+			"nonExistentKey":       "value",
+		})
+
+		require.EqualError(t, err, fmt.Sprintf(`%q config value is invalid: parse "https://Username:Password@example.com:port": invalid port ":port" after host`, ConfigKeyConnectionURI))
+	})
+
 	t.Run("fails when Host is empty", func(t *testing.T) {
 		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion: elasticsearch.Version6,
-			"nonExistentKey": "value",
+			ConfigKeyVersion:       elasticsearch.Version8,
+			ConfigKeyConnectionURI: "https://Username:Password@:1234/index/type?cloud_id=A&api_key=B&service_token=C&certificate_fingerprint=D",
+			"nonExistentKey":       "value",
 		})
 
-		require.EqualError(t, err, fmt.Sprintf("%q config value must be set", ConfigKeyHost))
+		require.EqualError(t, err, fmt.Sprintf("%q config value is invalid: host is required", ConfigKeyConnectionURI))
 	})
 
-	t.Run("fails when Username is provided but Password is empty", func(t *testing.T) {
+	t.Run("fails when URI scheme is unsupported", func(t *testing.T) {
 		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version6,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyUsername: fakerInstance.Internet().Email(),
-			"nonExistentKey":  "value",
+			ConfigKeyVersion:       elasticsearch.Version8,
+			ConfigKeyConnectionURI: "custom://Username:Password@example.com:1234/index/type?cloud_id=A&api_key=B&service_token=C&certificate_fingerprint=D",
+			"nonExistentKey":       "value",
 		})
 
-		require.EqualError(t, err, fmt.Sprintf("%q config value must be set when %q is provided", ConfigKeyPassword, ConfigKeyUsername))
+		require.EqualError(t, err, fmt.Sprintf("%q config value is invalid: URI scheme needs to be one of [http, https], \"custom\" provided", ConfigKeyConnectionURI))
 	})
 
-	t.Run("fails when Password is provided but Username is empty", func(t *testing.T) {
+	t.Run("fails when index name was not provided", func(t *testing.T) {
 		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version6,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyPassword: fakerInstance.Internet().Password(),
-			"nonExistentKey":  "value",
+			ConfigKeyVersion:       elasticsearch.Version8,
+			ConfigKeyConnectionURI: "https://Username:Password@example.com:1234?cloud_id=A&api_key=B&service_token=C&certificate_fingerprint=D",
+			"nonExistentKey":       "value",
 		})
 
-		require.EqualError(t, err, fmt.Sprintf("%q config value must be set when %q is provided", ConfigKeyUsername, ConfigKeyPassword))
-	})
-
-	t.Run("fails when Index is empty", func(t *testing.T) {
-		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion: elasticsearch.Version6,
-			ConfigKeyHost:    fakerInstance.Internet().URL(),
-			"nonExistentKey": "value",
-		})
-
-		require.EqualError(t, err, fmt.Sprintf("%q config value must be set", ConfigKeyIndex))
+		require.EqualError(t, err, fmt.Sprintf("%q config value is invalid: index name needs to be provided in the path", ConfigKeyConnectionURI))
 	})
 
 	for _, version := range []elasticsearch.Version{
+		elasticsearch.Version5,
 		elasticsearch.Version6,
 	} {
-		t.Run(fmt.Sprintf("fails when Type is empty for Version=%s", version), func(t *testing.T) {
+		t.Run(fmt.Sprintf("fails when index type was not provided for version=%s", version), func(t *testing.T) {
 			_, err := ParseConfig(map[string]string{
-				ConfigKeyVersion: version,
-				ConfigKeyHost:    fakerInstance.Internet().URL(),
-				ConfigKeyIndex:   fakerInstance.Lorem().Word(),
-				"nonExistentKey": "value",
+				ConfigKeyVersion:       version,
+				ConfigKeyConnectionURI: "https://Username:Password@example.com:1234/index?cloud_id=A&api_key=B&service_token=C&certificate_fingerprint=D",
+				"nonExistentKey":       "value",
 			})
 
-			require.EqualError(t, err, fmt.Sprintf("%q config value must be set", ConfigKeyType))
+			require.EqualError(t, err, fmt.Sprintf("%q config value is invalid: index type needs to be provided in the path", ConfigKeyConnectionURI))
 		})
 	}
 
 	t.Run("fails when Bulk Size is empty", func(t *testing.T) {
 		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion: elasticsearch.Version8,
-			ConfigKeyHost:    fakerInstance.Internet().URL(),
-			ConfigKeyIndex:   fakerInstance.Lorem().Word(),
-			"nonExistentKey": "value",
+			ConfigKeyVersion:       elasticsearch.Version8,
+			ConfigKeyConnectionURI: "https://example.com/index",
+			"nonExistentKey":       "value",
 		})
 
 		require.EqualError(t, err, fmt.Sprintf("%q config value must be set", ConfigKeyBulkSize))
@@ -122,11 +130,10 @@ func TestParseConfig(t *testing.T) {
 
 	t.Run("fails when Bulk Size is an invalid positive integer", func(t *testing.T) {
 		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version8,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyIndex:    fakerInstance.Lorem().Word(),
-			ConfigKeyBulkSize: "-1",
-			"nonExistentKey":  "value",
+			ConfigKeyVersion:       elasticsearch.Version8,
+			ConfigKeyConnectionURI: "https://example.com/index",
+			ConfigKeyBulkSize:      "-1",
+			"nonExistentKey":       "value",
 		})
 
 		require.EqualError(t, err, fmt.Sprintf(`failed to parse %q config value: strconv.ParseUint: parsing "-1": invalid syntax`, ConfigKeyBulkSize))
@@ -134,11 +141,10 @@ func TestParseConfig(t *testing.T) {
 
 	t.Run("fails when Bulk Size is less than 1", func(t *testing.T) {
 		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version8,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyIndex:    fakerInstance.Lorem().Word(),
-			ConfigKeyBulkSize: "0",
-			"nonExistentKey":  "value",
+			ConfigKeyVersion:       elasticsearch.Version8,
+			ConfigKeyConnectionURI: "https://example.com/index",
+			ConfigKeyBulkSize:      "0",
+			"nonExistentKey":       "value",
 		})
 
 		require.EqualError(t, err, fmt.Sprintf("failed to parse %q config value: value must be greater than 0", ConfigKeyBulkSize))
@@ -146,31 +152,34 @@ func TestParseConfig(t *testing.T) {
 
 	t.Run("fails when Bulk Size is greater than 10 000", func(t *testing.T) {
 		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version8,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyIndex:    fakerInstance.Lorem().Word(),
-			ConfigKeyBulkSize: "10001",
-			"nonExistentKey":  "value",
+			ConfigKeyVersion:       elasticsearch.Version8,
+			ConfigKeyConnectionURI: "https://example.com/index",
+			ConfigKeyBulkSize:      "10001",
+			"nonExistentKey":       "value",
 		})
 
 		require.EqualError(t, err, fmt.Sprintf("failed to parse %q config value: value must be less than 10 000", ConfigKeyBulkSize))
 	})
 
 	t.Run("returns config when all required config values were provided", func(t *testing.T) {
+		var (
+			host  = "example.com"
+			index = fakerInstance.Lorem().Word()
+		)
+
 		var cfgRaw = map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version8,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyIndex:    fakerInstance.Lorem().Word(),
-			ConfigKeyBulkSize: "1",
-			"nonExistentKey":  "value",
+			ConfigKeyVersion:       elasticsearch.Version8,
+			ConfigKeyConnectionURI: fmt.Sprintf("https://%s/%s", host, index),
+			ConfigKeyBulkSize:      "1",
+			"nonExistentKey":       "value",
 		}
 
 		config, err := ParseConfig(cfgRaw)
 
 		require.NoError(t, err)
 		require.Equal(t, cfgRaw[ConfigKeyVersion], config.Version)
-		require.Equal(t, cfgRaw[ConfigKeyHost], config.Host)
-		require.Equal(t, cfgRaw[ConfigKeyIndex], config.Index)
+		require.Equal(t, fmt.Sprintf("https://%s", host), config.Host)
+		require.Equal(t, index, config.Index)
 		require.Equal(t, cfgRaw[ConfigKeyBulkSize], fmt.Sprintf("%d", config.BulkSize))
 		require.Empty(t, "", config.Username)
 		require.Empty(t, "", config.Password)
@@ -181,37 +190,111 @@ func TestParseConfig(t *testing.T) {
 		require.Empty(t, "", config.CertificateFingerprint)
 	})
 
-	t.Run("returns config when all config values were provided", func(t *testing.T) {
-		var cfgRaw = map[string]string{
-			ConfigKeyVersion:                elasticsearch.Version8,
-			ConfigKeyHost:                   fakerInstance.Internet().URL(),
-			ConfigKeyIndex:                  fakerInstance.Lorem().Word(),
-			ConfigKeyType:                   fakerInstance.Lorem().Word(),
-			ConfigKeyBulkSize:               fmt.Sprintf("%d", fakerInstance.Int32Between(1, 10_000)),
-			ConfigKeyUsername:               fakerInstance.Internet().Email(),
-			ConfigKeyPassword:               fakerInstance.Internet().Password(),
-			ConfigKeyCloudID:                fakerInstance.RandomStringWithLength(32),
-			ConfigKeyAPIKey:                 fakerInstance.RandomStringWithLength(32),
-			ConfigKeyServiceToken:           fakerInstance.RandomStringWithLength(32),
-			ConfigKeyCertificateFingerprint: fakerInstance.Hash().SHA256(),
-			"nonExistentKey":                "value",
-		}
+	for _, version := range []elasticsearch.Version{
+		elasticsearch.Version5,
+		elasticsearch.Version6,
+	} {
+		t.Run(fmt.Sprintf("returns config when all config values were provided for version=%s", version), func(t *testing.T) {
+			var (
+				username               = fakerInstance.Internet().User()
+				password               = fakerInstance.Hash().MD5()
+				host                   = "example.com"
+				port                   = fakerInstance.IntBetween(0, 65535)
+				indexName              = fakerInstance.Lorem().Word()
+				indexType              = fakerInstance.Lorem().Word()
+				cloudID                = fakerInstance.RandomStringWithLength(32)
+				apiKey                 = fakerInstance.RandomStringWithLength(32)
+				serviceToken           = fakerInstance.RandomStringWithLength(32)
+				certificateFingerprint = fakerInstance.Hash().SHA256()
+			)
 
-		config, err := ParseConfig(cfgRaw)
+			var cfgRaw = map[string]string{
+				ConfigKeyVersion: version,
+				ConfigKeyConnectionURI: fmt.Sprintf(
+					"https://%s:%s@%s:%d/%s/%s?cloud_id=%s&api_key=%s&service_token=%s&certificate_fingerprint=%s",
+					username,
+					password,
+					host,
+					port,
+					indexName,
+					indexType,
+					cloudID,
+					apiKey,
+					serviceToken,
+					certificateFingerprint,
+				),
+				ConfigKeyBulkSize: fmt.Sprintf("%d", fakerInstance.Int32Between(1, 10_000)),
+				"nonExistentKey":  "value",
+			}
 
-		require.NoError(t, err)
-		require.Equal(t, cfgRaw[ConfigKeyVersion], config.Version)
-		require.Equal(t, cfgRaw[ConfigKeyHost], config.Host)
-		require.Equal(t, cfgRaw[ConfigKeyIndex], config.Index)
-		require.Equal(t, cfgRaw[ConfigKeyType], config.Type)
-		require.Equal(t, cfgRaw[ConfigKeyBulkSize], fmt.Sprintf("%d", config.BulkSize))
-		require.Equal(t, cfgRaw[ConfigKeyUsername], config.Username)
-		require.Equal(t, cfgRaw[ConfigKeyPassword], config.Password)
-		require.Equal(t, cfgRaw[ConfigKeyCloudID], config.CloudID)
-		require.Equal(t, cfgRaw[ConfigKeyAPIKey], config.APIKey)
-		require.Equal(t, cfgRaw[ConfigKeyServiceToken], config.ServiceToken)
-		require.Equal(t, cfgRaw[ConfigKeyCertificateFingerprint], config.CertificateFingerprint)
-	})
+			config, err := ParseConfig(cfgRaw)
+
+			require.NoError(t, err)
+			require.Equal(t, cfgRaw[ConfigKeyVersion], config.Version)
+			require.Equal(t, fmt.Sprintf("https://%s:%d", host, port), config.Host)
+			require.Equal(t, indexName, config.Index)
+			require.Equal(t, indexType, config.Type)
+			require.Equal(t, cfgRaw[ConfigKeyBulkSize], fmt.Sprintf("%d", config.BulkSize))
+			require.Equal(t, username, config.Username)
+			require.Equal(t, password, config.Password)
+			require.Equal(t, cloudID, config.CloudID)
+			require.Equal(t, apiKey, config.APIKey)
+			require.Equal(t, serviceToken, config.ServiceToken)
+			require.Equal(t, certificateFingerprint, config.CertificateFingerprint)
+		})
+	}
+
+	for _, version := range []elasticsearch.Version{
+		elasticsearch.Version7,
+		elasticsearch.Version8,
+	} {
+		t.Run(fmt.Sprintf("returns config when all config values were provided for version=%s", version), func(t *testing.T) {
+			var (
+				username               = fakerInstance.Internet().User()
+				password               = fakerInstance.Hash().MD5()
+				host                   = "example.com"
+				port                   = fakerInstance.IntBetween(0, 65535)
+				indexName              = fakerInstance.Lorem().Word()
+				cloudID                = fakerInstance.RandomStringWithLength(32)
+				apiKey                 = fakerInstance.RandomStringWithLength(32)
+				serviceToken           = fakerInstance.RandomStringWithLength(32)
+				certificateFingerprint = fakerInstance.Hash().SHA256()
+			)
+
+			var cfgRaw = map[string]string{
+				ConfigKeyVersion: version,
+				ConfigKeyConnectionURI: fmt.Sprintf(
+					"https://%s:%s@%s:%d/%s?cloud_id=%s&api_key=%s&service_token=%s&certificate_fingerprint=%s",
+					username,
+					password,
+					host,
+					port,
+					indexName,
+					cloudID,
+					apiKey,
+					serviceToken,
+					certificateFingerprint,
+				),
+				ConfigKeyBulkSize: fmt.Sprintf("%d", fakerInstance.Int32Between(1, 10_000)),
+				"nonExistentKey":  "value",
+			}
+
+			config, err := ParseConfig(cfgRaw)
+
+			require.NoError(t, err)
+			require.Equal(t, cfgRaw[ConfigKeyVersion], config.Version)
+			require.Equal(t, fmt.Sprintf("https://%s:%d", host, port), config.Host)
+			require.Equal(t, indexName, config.Index)
+			require.Equal(t, "", config.Type)
+			require.Equal(t, cfgRaw[ConfigKeyBulkSize], fmt.Sprintf("%d", config.BulkSize))
+			require.Equal(t, username, config.Username)
+			require.Equal(t, password, config.Password)
+			require.Equal(t, cloudID, config.CloudID)
+			require.Equal(t, apiKey, config.APIKey)
+			require.Equal(t, serviceToken, config.ServiceToken)
+			require.Equal(t, certificateFingerprint, config.CertificateFingerprint)
+		})
+	}
 }
 
 func TestConfig_Getters(t *testing.T) {
@@ -225,6 +308,8 @@ func TestConfig_Getters(t *testing.T) {
 		apiKey                 = fakerInstance.RandomStringWithLength(32)
 		serviceToken           = fakerInstance.RandomStringWithLength(32)
 		certificateFingerprint = fakerInstance.Hash().SHA256()
+		indexName              = fakerInstance.Lorem().Word()
+		indexType              = fakerInstance.Lorem().Word()
 	)
 
 	config := Config{
@@ -235,6 +320,8 @@ func TestConfig_Getters(t *testing.T) {
 		APIKey:                 apiKey,
 		ServiceToken:           serviceToken,
 		CertificateFingerprint: certificateFingerprint,
+		Index:                  indexName,
+		Type:                   indexType,
 	}
 
 	require.Equal(t, host, config.GetHost())
@@ -244,4 +331,6 @@ func TestConfig_Getters(t *testing.T) {
 	require.Equal(t, apiKey, config.GetAPIKey())
 	require.Equal(t, serviceToken, config.GetServiceToken())
 	require.Equal(t, certificateFingerprint, config.GetCertificateFingerprint())
+	require.Equal(t, indexName, config.GetIndex())
+	require.Equal(t, indexType, config.GetType())
 }

@@ -16,6 +16,7 @@ package destination
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -23,17 +24,9 @@ import (
 )
 
 const (
-	ConfigKeyVersion                = "version"
-	ConfigKeyHost                   = "host"
-	ConfigKeyUsername               = "username"
-	ConfigKeyPassword               = "password"
-	ConfigKeyCloudID                = "cloudId"
-	ConfigKeyAPIKey                 = "apiKey"
-	ConfigKeyServiceToken           = "serviceToken"
-	ConfigKeyCertificateFingerprint = "certificateFingerprint"
-	ConfigKeyIndex                  = "index"
-	ConfigKeyType                   = "type"
-	ConfigKeyBulkSize               = "bulkSize"
+	ConfigKeyVersion       = "version"
+	ConfigKeyConnectionURI = "connectionUri"
+	ConfigKeyBulkSize      = "bulkSize"
 )
 
 type Config struct {
@@ -86,20 +79,10 @@ func (c Config) GetType() string {
 	return c.Type
 }
 
-func ParseConfig(cfgRaw map[string]string) (Config, error) {
-	cfg := Config{
-		Version:                cfgRaw[ConfigKeyVersion],
-		Host:                   cfgRaw[ConfigKeyHost],
-		Username:               cfgRaw[ConfigKeyUsername],
-		Password:               cfgRaw[ConfigKeyPassword],
-		CloudID:                cfgRaw[ConfigKeyCloudID],
-		APIKey:                 cfgRaw[ConfigKeyAPIKey],
-		ServiceToken:           cfgRaw[ConfigKeyServiceToken],
-		CertificateFingerprint: cfgRaw[ConfigKeyCertificateFingerprint],
-		Index:                  cfgRaw[ConfigKeyIndex],
-		Type:                   cfgRaw[ConfigKeyType],
-	}
+func ParseConfig(cfgRaw map[string]string) (cfg Config, err error) {
+	cfg.Version = cfgRaw[ConfigKeyVersion]
 
+	// Version
 	if cfg.Version == "" {
 		return Config{}, requiredConfigErr(ConfigKeyVersion)
 	}
@@ -120,38 +103,81 @@ func ParseConfig(cfgRaw map[string]string) (Config, error) {
 		)
 	}
 
-	if cfg.Host == "" {
-		return Config{}, requiredConfigErr(ConfigKeyHost)
-	}
-
-	if cfg.Username != "" && cfg.Password == "" {
-		return Config{}, fmt.Errorf("%q config value must be set when %q is provided", ConfigKeyPassword, ConfigKeyUsername)
-	}
-
-	if cfg.Username == "" && cfg.Password != "" {
-		return Config{}, fmt.Errorf("%q config value must be set when %q is provided", ConfigKeyUsername, ConfigKeyPassword)
-	}
-
-	if cfg.Index == "" {
-		return Config{}, requiredConfigErr(ConfigKeyIndex)
-	}
-
-	if cfg.Version == elasticsearch.Version6 && cfg.Type == "" {
-		return Config{}, requiredConfigErr(ConfigKeyType)
-	}
-
-	bulkSizeParsed, err := parseBulkSizeConfigValue(cfgRaw)
+	// Connection URI
+	cfg.Host, cfg.Username, cfg.Password, cfg.Index, cfg.Type, cfg.CloudID, cfg.APIKey, cfg.ServiceToken, cfg.CertificateFingerprint, err = parseConnectionURIConfigValue(cfg, cfgRaw)
 	if err != nil {
 		return Config{}, err
 	}
 
-	cfg.BulkSize = bulkSizeParsed
+	// Bulk size
+	cfg.BulkSize, err = parseBulkSizeConfigValue(cfgRaw)
+	if err != nil {
+		return Config{}, err
+	}
 
 	return cfg, nil
 }
 
 func requiredConfigErr(name string) error {
 	return fmt.Errorf("%q config value must be set", name)
+}
+
+func parseConnectionURIConfigValue(
+	cfg Config,
+	cfgRaw map[string]string,
+) (
+	host, username, password, indexName, indexType, cloudID, apiKey, serviceToken, certificateFingerprint string,
+	_ error,
+) {
+	connectionURI, exists := cfgRaw[ConfigKeyConnectionURI]
+	if !exists || connectionURI == "" {
+		return "", "", "", "", "", "", "", "", "", requiredConfigErr(ConfigKeyConnectionURI)
+	}
+
+	connectionURIParsed, err := url.Parse(connectionURI)
+	if err != nil {
+		return "", "", "", "", "", "", "", "", "", fmt.Errorf("%q config value is invalid: %w", ConfigKeyConnectionURI, err)
+	}
+
+	if connectionURIParsed.Hostname() == "" {
+		return "", "", "", "", "", "", "", "", "", fmt.Errorf("%q config value is invalid: host is required", ConfigKeyConnectionURI)
+	}
+
+	host = fmt.Sprintf("%s://%s", connectionURIParsed.Scheme, connectionURIParsed.Host)
+
+	if connectionURIParsed.Scheme != "http" && connectionURIParsed.Scheme != "https" {
+		return "", "", "", "", "", "", "", "", "", fmt.Errorf("%q config value is invalid: URI scheme needs to be one of [http, https], %q provided", ConfigKeyConnectionURI, connectionURIParsed.Scheme)
+	}
+
+	if user := connectionURIParsed.User; user != nil {
+		username = user.Username()
+		password, _ = user.Password()
+	}
+
+	index := strings.SplitN(strings.TrimLeft(connectionURIParsed.Path, "/"), "/", 3)
+	if cfg.Version == elasticsearch.Version5 || cfg.Version == elasticsearch.Version6 {
+		if len(index) < 2 || index[1] == "" {
+			return "", "", "", "", "", "", "", "", "", fmt.Errorf("%q config value is invalid: index type needs to be provided in the path", ConfigKeyConnectionURI)
+		}
+
+		indexName = index[0]
+		indexType = index[1]
+	} else {
+		indexName = index[0]
+	}
+
+	if indexName == "" {
+		return "", "", "", "", "", "", "", "", "", fmt.Errorf("%q config value is invalid: index name needs to be provided in the path", ConfigKeyConnectionURI)
+	}
+
+	query := connectionURIParsed.Query()
+
+	cloudID = query.Get("cloud_id")
+	apiKey = query.Get("api_key")
+	serviceToken = query.Get("service_token")
+	certificateFingerprint = query.Get("certificate_fingerprint")
+
+	return host, username, password, indexName, indexType, cloudID, apiKey, serviceToken, certificateFingerprint, nil
 }
 
 func parseBulkSizeConfigValue(cfgRaw map[string]string) (uint64, error) {
