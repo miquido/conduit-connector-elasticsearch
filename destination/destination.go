@@ -133,7 +133,7 @@ func (d *Destination) Flush(ctx context.Context) error {
 
 	// Ack results
 	for _, item := range response.Items {
-		var itemResponse BulkResponseItem
+		var itemResponse bulkResponseItem
 
 		switch {
 		case item.Update != nil:
@@ -203,12 +203,12 @@ func (d *Destination) writeDeleteOperation(key string, data *bytes.Buffer) error
 	return nil
 }
 
-func (d *Destination) executeBulkRequest(ctx context.Context, data *bytes.Buffer) (BulkResponse, error) {
+func (d *Destination) executeBulkRequest(ctx context.Context, data *bytes.Buffer) (bulkResponse, error) {
 	// Check if there is any job to do
 	if data.Len() < 1 {
 		sdk.Logger(ctx).Info().Msg("no operations to execute in bulk, skipping")
 
-		return BulkResponse{}, nil
+		return bulkResponse{}, nil
 	}
 
 	defer data.Reset()
@@ -216,26 +216,26 @@ func (d *Destination) executeBulkRequest(ctx context.Context, data *bytes.Buffer
 	// Execute the request
 	responseBody, err := d.client.Bulk(ctx, bytes.NewReader(data.Bytes()))
 	if err != nil {
-		return BulkResponse{}, fmt.Errorf("bulk request failure: %w", err)
+		return bulkResponse{}, fmt.Errorf("bulk request failure: %w", err)
 	}
 
 	// Get the response
 	bodyContents, err := io.ReadAll(responseBody)
 	if err != nil {
-		return BulkResponse{}, fmt.Errorf("bulk response failure: failed to read the result: %w", err)
+		return bulkResponse{}, fmt.Errorf("bulk response failure: failed to read the result: %w", err)
 	}
 	defer responseBody.Close()
 
 	// Read individual errors
-	var response BulkResponse
+	var response bulkResponse
 	if err := json.Unmarshal(bodyContents, &response); err != nil {
-		return BulkResponse{}, fmt.Errorf("bulk response failure: could not read the response: %w", err)
+		return bulkResponse{}, fmt.Errorf("bulk response failure: could not read the response: %w", err)
 	}
 
 	return response, nil
 }
 
-func (d *Destination) sendAckForOperation(itemResponse BulkResponseItem) error {
+func (d *Destination) sendAckForOperation(itemResponse bulkResponseItem) error {
 	ackFunc, exists := d.ackFuncsBuffer[itemResponse.ID]
 	if !exists {
 		return fmt.Errorf("bulk response failure: could not ack item with key=%s: no ack function was registered", itemResponse.ID)
@@ -271,59 +271,4 @@ func (d *Destination) sendAckForOperation(itemResponse BulkResponseItem) error {
 	}
 
 	return nil
-}
-
-type BulkRequestActionAndMetadata struct {
-	// Update *BulkRequestUpdateAction `json:"update,omitempty"`
-	// Delete *BulkRequestDeleteAction `json:"delete,omitempty"`
-	Update interface{} `json:"update,omitempty"`
-	Delete interface{} `json:"delete,omitempty"`
-}
-
-type BulkRequestUpdateAction struct {
-	ID              string  `json:"_id"`
-	Index           string  `json:"_index"`
-	Type            *string `json:"_type"`
-	RetryOnConflict int     `json:"retry_on_conflict"`
-}
-
-type BulkRequestDeleteAction struct {
-	ID    string  `json:"_id"`
-	Index string  `json:"_index"`
-	Type  *string `json:"_type"`
-}
-
-type BulkRequestOptionalSource struct {
-	Doc         json.RawMessage `json:"doc"`
-	DocAsUpsert bool            `json:"doc_as_upsert"`
-}
-
-type BulkResponse struct {
-	Took   int  `json:"took"`
-	Errors bool `json:"errors"`
-	Items  []struct {
-		Update *BulkResponseItem `json:"update,omitempty"`
-		Delete *BulkResponseItem `json:"delete,omitempty"`
-	} `json:"items"`
-}
-
-type BulkResponseItem struct {
-	Index   string `json:"_index"`
-	Type    string `json:"_type"`
-	ID      string `json:"_id"`
-	Version int    `json:"_version,omitempty"`
-	Result  string `json:"result,omitempty"`
-	Shards  *struct {
-		Total      int `json:"total"`
-		Successful int `json:"successful"`
-		Failed     int `json:"failed"`
-	} `json:"_shards,omitempty"`
-	SeqNo       int `json:"_seq_no,omitempty"`
-	PrimaryTerm int `json:"_primary_term,omitempty"`
-	Status      int `json:"status"`
-	Error       *struct {
-		Type     string          `json:"type"`
-		Reason   string          `json:"reason"`
-		CausedBy json.RawMessage `json:"caused_by"`
-	} `json:"error,omitempty"`
 }
