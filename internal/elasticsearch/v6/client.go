@@ -93,6 +93,24 @@ func (c *Client) Bulk(ctx context.Context, reader io.Reader) (io.ReadCloser, err
 	return result.Body, nil
 }
 
+func (c *Client) PrepareCreateOperation(item sdk.Record) (interface{}, interface{}, error) {
+	// Prepare metadata
+	metadata := bulkRequestActionAndMetadata{
+		Create: &bulkRequestCreateAction{
+			Index: c.cfg.GetIndex(),
+			Type:  c.cfg.GetType(),
+		},
+	}
+
+	// Prepare payload
+	payload, err := preparePayload(&item)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return metadata, bulkRequestCreateSource(payload), nil
+}
+
 func (c *Client) PrepareUpsertOperation(key string, item sdk.Record) (interface{}, interface{}, error) {
 	// Prepare metadata
 	metadata := bulkRequestActionAndMetadata{
@@ -105,24 +123,16 @@ func (c *Client) PrepareUpsertOperation(key string, item sdk.Record) (interface{
 	}
 
 	// Prepare payload
+	var err error
+
 	payload := bulkRequestOptionalSource{
 		Doc:         nil,
 		DocAsUpsert: true,
 	}
 
-	switch itemPayload := item.Payload.(type) {
-	case sdk.StructuredData:
-		var err error
-
-		// Payload is potentially convertable into JSON
-		payload.Doc, err = json.Marshal(itemPayload)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to prepare data with key=%s: %w", key, err)
-		}
-
-	default:
-		// Nothing more can be done, we can trust the source to provide valid JSON
-		payload.Doc = itemPayload.Bytes()
+	payload.Doc, err = preparePayload(&item)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	return metadata, payload, nil
@@ -136,4 +146,15 @@ func (c *Client) PrepareDeleteOperation(key string) (interface{}, error) {
 			Type:  c.cfg.GetType(),
 		},
 	}, nil
+}
+
+func preparePayload(item *sdk.Record) (json.RawMessage, error) {
+	switch itemPayload := item.Payload.(type) {
+	case sdk.StructuredData:
+		return json.Marshal(itemPayload)
+
+	default:
+		// Nothing more can be done, we can trust the source to provide valid JSON
+		return itemPayload.Bytes(), nil
+	}
 }

@@ -105,8 +105,20 @@ func (d *Destination) Flush(ctx context.Context) error {
 
 	for _, item := range d.recordsBuffer {
 		key := string(item.Key.Bytes())
+		action := item.Metadata["action"]
 
-		switch action := item.Metadata["action"]; action {
+		if key == "" {
+			action = "insert"
+		} else if action == "" {
+			action = "create"
+		}
+
+		switch action {
+		case "insert":
+			if err := d.writeInsertOperation(data, item); err != nil {
+				return err
+			}
+
 		case "create", "created",
 			"update", "updated":
 			if err := d.writeUpsertOperation(key, data, item); err != nil {
@@ -136,6 +148,9 @@ func (d *Destination) Flush(ctx context.Context) error {
 		var itemResponse bulkResponseItem
 
 		switch {
+		case item.Create != nil:
+			itemResponse = *item.Create
+
 		case item.Update != nil:
 			itemResponse = *item.Update
 
@@ -164,11 +179,33 @@ func (d *Destination) Teardown(context.Context) error {
 	return nil // No close routine needed
 }
 
+func (d *Destination) writeInsertOperation(data *bytes.Buffer, item sdk.Record) error {
+	jsonEncoder := json.NewEncoder(data)
+
+	// Prepare data
+	metadata, payload, err := d.client.PrepareCreateOperation(item)
+	if err != nil {
+		return fmt.Errorf("failed to prepare metadata: %w", err)
+	}
+
+	// Write metadata
+	if err := jsonEncoder.Encode(metadata); err != nil {
+		return fmt.Errorf("failed to prepare metadata: %w", err)
+	}
+
+	// Write payload
+	if err := jsonEncoder.Encode(payload); err != nil {
+		return fmt.Errorf("failed to prepare data: %w", err)
+	}
+
+	return nil
+}
+
 func (d *Destination) writeUpsertOperation(key string, data *bytes.Buffer, item sdk.Record) error {
 	jsonEncoder := json.NewEncoder(data)
 
 	// Prepare data
-	metadata, sourcePayload, err := d.client.PrepareUpsertOperation(key, item)
+	metadata, payload, err := d.client.PrepareUpsertOperation(key, item)
 	if err != nil {
 		return fmt.Errorf("failed to prepare metadata with key=%s: %w", key, err)
 	}
@@ -179,7 +216,7 @@ func (d *Destination) writeUpsertOperation(key string, data *bytes.Buffer, item 
 	}
 
 	// Write payload
-	if err := jsonEncoder.Encode(sourcePayload); err != nil {
+	if err := jsonEncoder.Encode(payload); err != nil {
 		return fmt.Errorf("failed to prepare data with key=%s: %w", key, err)
 	}
 

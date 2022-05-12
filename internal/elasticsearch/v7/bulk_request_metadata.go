@@ -15,8 +15,13 @@
 package v7
 
 type bulkRequestActionAndMetadata struct {
+	Create *bulkRequestCreateAction `json:"create,omitempty"`
 	Update *bulkRequestUpdateAction `json:"update,omitempty"`
 	Delete *bulkRequestDeleteAction `json:"delete,omitempty"`
+}
+
+type bulkRequestCreateAction struct {
+	Index string `json:"_index"`
 }
 
 type bulkRequestUpdateAction struct {

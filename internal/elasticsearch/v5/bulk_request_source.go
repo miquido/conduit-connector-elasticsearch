@@ -16,7 +16,9 @@ package v5
 
 import "encoding/json"
 
-type bulkRequestOptionalSource struct {
+type bulkRequestCreateSource json.RawMessage
+
+type bulkRequestUpdateSource struct {
 	Doc         json.RawMessage `json:"doc"`
 	DocAsUpsert bool            `json:"doc_as_upsert"`
 }
