@@ -142,7 +142,7 @@ func TestParseConfig(t *testing.T) {
 			"nonExistentKey":  "value",
 		})
 
-		require.EqualError(t, err, fmt.Sprintf("failed to parse %q config value: value must be less than 10 000", ConfigKeyBulkSize))
+		require.EqualError(t, err, fmt.Sprintf("failed to parse %q config value: value must not be grater than 10 000", ConfigKeyBulkSize))
 	})
 
 	t.Run("returns config when all required config values were provided", func(t *testing.T) {
