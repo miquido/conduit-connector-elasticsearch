@@ -124,10 +124,6 @@ func ParseConfig(cfgRaw map[string]string) (Config, error) {
 		return Config{}, requiredConfigErr(ConfigKeyHost)
 	}
 
-	if cfg.Username != "" && cfg.Password == "" {
-		return Config{}, fmt.Errorf("%q config value must be set when %q is provided", ConfigKeyPassword, ConfigKeyUsername)
-	}
-
 	if cfg.Username == "" && cfg.Password != "" {
 		return Config{}, fmt.Errorf("%q config value must be set when %q is provided", ConfigKeyUsername, ConfigKeyPassword)
 	}

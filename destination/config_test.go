@@ -62,17 +62,6 @@ func TestParseConfig(t *testing.T) {
 		require.EqualError(t, err, fmt.Sprintf("%q config value must be set", ConfigKeyHost))
 	})
 
-	t.Run("fails when Username is provided but Password is empty", func(t *testing.T) {
-		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version6,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyUsername: fakerInstance.Internet().Email(),
-			"nonExistentKey":  "value",
-		})
-
-		require.EqualError(t, err, fmt.Sprintf("%q config value must be set when %q is provided", ConfigKeyPassword, ConfigKeyUsername))
-	})
-
 	t.Run("fails when Password is provided but Username is empty", func(t *testing.T) {
 		_, err := ParseConfig(map[string]string{
 			ConfigKeyVersion:  elasticsearch.Version6,
