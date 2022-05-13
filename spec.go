@@ -16,6 +16,7 @@ package elasticsearch
 
 import (
 	sdk "github.com/conduitio/conduit-connector-sdk"
+	"github.com/miquido/conduit-connector-elasticsearch/destination"
 )
 
 func Specification() sdk.Specification {
@@ -25,57 +26,57 @@ func Specification() sdk.Specification {
 		Version: "v0.1.0",
 		Author:  "Miquido",
 		DestinationParams: map[string]sdk.Parameter{
-			"version": {
+			destination.ConfigKeyVersion: {
 				Default:     "",
 				Required:    false,
 				Description: "The version of the Elasticsearch service.",
 			},
-			"host": {
+			destination.ConfigKeyHost: {
 				Default:     "",
 				Required:    true,
 				Description: "The Elasticsearh host and port (e.g.: http://127.0.0.1:9200).",
 			},
-			"username": {
+			destination.ConfigKeyUsername: {
 				Default:     "",
 				Required:    false,
 				Description: "The username for HTTP Basic Authentication.",
 			},
-			"password": {
+			destination.ConfigKeyPassword: {
 				Default:     "",
 				Required:    false,
 				Description: "The password for HTTP Basic Authentication.",
 			},
-			"cloudId": {
+			destination.ConfigKeyCloudID: {
 				Default:     "",
 				Required:    false,
 				Description: "Endpoint for the Elastic Service (https://elastic.co/cloud).",
 			},
-			"apiKey": {
+			destination.ConfigKeyAPIKey: {
 				Default:     "",
 				Required:    false,
 				Description: "Base64-encoded token for authorization; if set, overrides username/password and service token.",
 			},
-			"serviceToken": {
+			destination.ConfigKeyServiceToken: {
 				Default:     "",
 				Required:    false,
 				Description: "Service token for authorization; if set, overrides username/password.",
 			},
-			"certificateFingerprint": {
+			destination.ConfigKeyCertificateFingerprint: {
 				Default:     "",
 				Required:    false,
 				Description: "SHA256 hex fingerprint given by Elasticsearch on first launch.",
 			},
-			"index": {
+			destination.ConfigKeyIndex: {
 				Default:     "",
 				Required:    true,
 				Description: "The name of the index to write the data to.",
 			},
-			"type": {
+			destination.ConfigKeyType: {
 				Default:     "",
 				Required:    false,
 				Description: "The name of the index's type to write the data to. Required when version is 6.",
 			},
-			"bulkSize": {
+			destination.ConfigKeyBulkSize: {
 				Default:     "1000",
 				Required:    true,
 				Description: "The maximum size of operations sent to Elasticsearch server.",
