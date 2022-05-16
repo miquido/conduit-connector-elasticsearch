@@ -33,11 +33,10 @@ func NewDestination() sdk.Destination {
 type Destination struct {
 	sdk.UnimplementedDestination
 
-	config         Config
-	client         elasticsearch.Client
-	mutex          sync.Mutex
-	recordsBuffer  []sdk.Record
-	ackFuncsBuffer map[string]sdk.AckFunc
+	config          Config
+	client          elasticsearch.Client
+	mutex           sync.Mutex
+	operationsQueue BufferQueue
 }
 
 func (d *Destination) GetClient() elasticsearch.Client {
@@ -62,31 +61,24 @@ func (d *Destination) Open(ctx context.Context) (err error) {
 		return fmt.Errorf("connection could not be established: %w", err)
 	}
 
-	// Initializing the buffer
+	// Initialize the buffer
 	d.mutex = sync.Mutex{}
-	d.recordsBuffer = make([]sdk.Record, 0, d.config.BulkSize)
-	d.ackFuncsBuffer = make(map[string]sdk.AckFunc, d.config.BulkSize)
+	d.operationsQueue = make(BufferQueue, 0, d.config.BulkSize)
 
 	return nil
 }
 
 func (d *Destination) WriteAsync(ctx context.Context, record sdk.Record, ackFunc sdk.AckFunc) error {
-	key := string(record.Key.Bytes())
-	if key == "" {
-		if err := ackFunc(fmt.Errorf("record's Key is required")); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	d.recordsBuffer = append(d.recordsBuffer, record)
-	d.ackFuncsBuffer[key] = ackFunc
+	d.operationsQueue.Enqueue(&operation{
+		CreatedAt: record.CreatedAt,
+		Record:    record,
+		AckFunc:   ackFunc,
+	})
 
-	if uint64(len(d.recordsBuffer)) >= d.config.BulkSize {
+	if uint64(d.operationsQueue.Len()) >= d.config.BulkSize {
 		if err := d.Flush(ctx); err != nil {
 			return err
 		}
@@ -96,45 +88,21 @@ func (d *Destination) WriteAsync(ctx context.Context, record sdk.Record, ackFunc
 }
 
 func (d *Destination) Flush(ctx context.Context) error {
-	if len(d.recordsBuffer) == 0 {
+	d.operationsQueue.Sort()
+
+	pendingOperations := d.operationsQueue
+	queueLength := pendingOperations.Len()
+
+	if queueLength == 0 {
 		return nil
 	}
 
+	// failedOperations := make(BufferQueue, 0, queueLength)
+
 	// Prepare request payload
-	data := &bytes.Buffer{}
-
-	for _, item := range d.recordsBuffer {
-		key := string(item.Key.Bytes())
-		action := item.Metadata["action"]
-
-		if key == "" {
-			action = "insert"
-		} else if action == "" {
-			action = "create"
-		}
-
-		switch action {
-		case "insert":
-			if err := d.writeInsertOperation(data, item); err != nil {
-				return err
-			}
-
-		case "create", "created",
-			"update", "updated":
-			if err := d.writeUpsertOperation(key, data, item); err != nil {
-				return err
-			}
-
-		case "delete", "deleted":
-			if err := d.writeDeleteOperation(key, data); err != nil {
-				return err
-			}
-
-		default:
-			sdk.Logger(ctx).Warn().Msgf("unsupported action: %+v", action)
-
-			continue
-		}
+	data, err := d.prepareBulkRequestPayload(ctx, pendingOperations)
+	if err != nil {
+		return err
 	}
 
 	// Send the bulk request
@@ -144,7 +112,7 @@ func (d *Destination) Flush(ctx context.Context) error {
 	}
 
 	// Ack results
-	for _, item := range response.Items {
+	for n, item := range response.Items {
 		var itemResponse bulkResponseItem
 
 		switch {
@@ -163,20 +131,99 @@ func (d *Destination) Flush(ctx context.Context) error {
 			continue
 		}
 
-		if err := d.sendAckForOperation(itemResponse); err != nil {
+		// New?
+		ackFunc := pendingOperations[n].AckFunc
+
+		if itemResponse.Status >= 200 && itemResponse.Status < 300 {
+			if err := ackFunc(nil); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		var operationError error
+
+		if itemResponse.Error == nil {
+			operationError = fmt.Errorf(
+				"item with key=%s create/upsert/delete failure: unknown error",
+				itemResponse.ID,
+			)
+		} else {
+			operationError = fmt.Errorf(
+				"item with key=%s create/upsert/delete failure: [%s] %s: %s",
+				itemResponse.ID,
+				itemResponse.Error.Type,
+				itemResponse.Error.Reason,
+				itemResponse.Error.CausedBy,
+			)
+		}
+
+		if err := ackFunc(operationError); err != nil {
 			return err
 		}
+
+		// failedOperations = append(failedOperations, pendingOperations[n])
+
+		// // Old
+		// if err := d.sendAckForOperation(itemResponse); err != nil {
+		// 	return err
+		// }
 	}
 
 	// Reset buffers
-	d.recordsBuffer = d.recordsBuffer[:0]
-	d.ackFuncsBuffer = make(map[string]sdk.AckFunc, d.config.BulkSize)
+	d.operationsQueue = make(BufferQueue, 0, d.config.BulkSize)
 
 	return nil
 }
 
 func (d *Destination) Teardown(context.Context) error {
 	return nil // No close routine needed
+}
+
+func (d *Destination) prepareBulkRequestPayload(ctx context.Context, pendingOperations BufferQueue) (*bytes.Buffer, error) {
+	data := &bytes.Buffer{}
+
+	for _, item := range pendingOperations {
+		record := item.Record
+		action := record.Metadata["action"]
+
+		var key string
+		if record.Key != nil {
+			key = string(record.Key.Bytes())
+		}
+
+		if key == "" {
+			action = "insert"
+		} else if action == "" {
+			action = "create"
+		}
+
+		switch action {
+		case "insert":
+			if err := d.writeInsertOperation(data, record); err != nil {
+				return nil, err
+			}
+
+		case "create", "created",
+			"update", "updated":
+			if err := d.writeUpsertOperation(key, data, record); err != nil {
+				return nil, err
+			}
+
+		case "delete", "deleted":
+			if err := d.writeDeleteOperation(key, data); err != nil {
+				return nil, err
+			}
+
+		default:
+			sdk.Logger(ctx).Warn().Msgf("unsupported action: %+v", action)
+
+			continue
+		}
+	}
+
+	return data, nil
 }
 
 func (d *Destination) writeInsertOperation(data *bytes.Buffer, item sdk.Record) error {
@@ -270,42 +317,4 @@ func (d *Destination) executeBulkRequest(ctx context.Context, data *bytes.Buffer
 	}
 
 	return response, nil
-}
-
-func (d *Destination) sendAckForOperation(itemResponse bulkResponseItem) error {
-	ackFunc, exists := d.ackFuncsBuffer[itemResponse.ID]
-	if !exists {
-		return fmt.Errorf("bulk response failure: could not ack item with key=%s: no ack function was registered", itemResponse.ID)
-	}
-
-	if itemResponse.Status >= 200 && itemResponse.Status < 300 {
-		if err := ackFunc(nil); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	var operationError error
-
-	if itemResponse.Error == nil {
-		operationError = fmt.Errorf(
-			"item with key=%s upsert/delete failure: unknown error",
-			itemResponse.ID,
-		)
-	} else {
-		operationError = fmt.Errorf(
-			"item with key=%s upsert/delete failure: [%s] %s: %s",
-			itemResponse.ID,
-			itemResponse.Error.Type,
-			itemResponse.Error.Reason,
-			itemResponse.Error.CausedBy,
-		)
-	}
-
-	if err := ackFunc(operationError); err != nil {
-		return err
-	}
-
-	return nil
 }

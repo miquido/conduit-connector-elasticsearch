@@ -214,6 +214,8 @@ func TestConfig_Getters(t *testing.T) {
 		apiKey                 = fakerInstance.RandomStringWithLength(32)
 		serviceToken           = fakerInstance.RandomStringWithLength(32)
 		certificateFingerprint = fakerInstance.Hash().SHA256()
+		indexName              = fakerInstance.Lorem().Word()
+		indexType              = fakerInstance.Lorem().Word()
 	)
 
 	config := Config{
@@ -224,6 +226,8 @@ func TestConfig_Getters(t *testing.T) {
 		APIKey:                 apiKey,
 		ServiceToken:           serviceToken,
 		CertificateFingerprint: certificateFingerprint,
+		Index:                  indexName,
+		Type:                   indexType,
 	}
 
 	require.Equal(t, host, config.GetHost())
@@ -233,4 +237,6 @@ func TestConfig_Getters(t *testing.T) {
 	require.Equal(t, apiKey, config.GetAPIKey())
 	require.Equal(t, serviceToken, config.GetServiceToken())
 	require.Equal(t, certificateFingerprint, config.GetCertificateFingerprint())
+	require.Equal(t, indexName, config.GetIndex())
+	require.Equal(t, indexType, config.GetType())
 }

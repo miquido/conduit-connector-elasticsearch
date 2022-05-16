@@ -147,7 +147,7 @@ func (c *Client) PrepareDeleteOperation(key string) (interface{}, error) {
 	}, nil
 }
 
-func preparePayload(item *sdk.Record) (json.RawMessage, error) {
+func preparePayload(item *sdk.Record) ([]byte, error) {
 	switch itemPayload := item.Payload.(type) {
 	case sdk.StructuredData:
 		return json.Marshal(itemPayload)

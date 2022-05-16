@@ -31,7 +31,7 @@ type Client interface {
 	// See: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 	Bulk(ctx context.Context, reader io.Reader) (io.ReadCloser, error)
 
-	// PrepareInsertOperation prepares insert operation definition
+	// PrepareCreateOperation prepares insert operation definition
 	PrepareCreateOperation(item sdk.Record) (metadata interface{}, payload interface{}, err error)
 
 	// PrepareUpsertOperation prepares upsert operation definition

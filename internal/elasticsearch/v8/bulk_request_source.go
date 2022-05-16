@@ -16,7 +16,11 @@ package v8
 
 import "encoding/json"
 
-type bulkRequestCreateSource json.RawMessage
+type bulkRequestCreateSource []byte
+
+func (b bulkRequestCreateSource) MarshalJSON() ([]byte, error) {
+	return b, nil
+}
 
 type bulkRequestOptionalSource struct {
 	Doc         json.RawMessage `json:"doc"`

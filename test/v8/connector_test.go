@@ -111,6 +111,32 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 			user2,
 		}))
 	})
+
+	t.Run("record can be created", func(t *testing.T) {
+		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
+			Metadata:  nil,
+			Payload:   sdk.StructuredData(user1),
+			Key:       nil,
+			CreatedAt: time.Now(),
+		}, ackFunc(t)))
+		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
+			Metadata: map[string]string{
+				"action": "updated",
+			},
+			Payload:   sdk.StructuredData(user2),
+			Key:       nil,
+			CreatedAt: time.Now(),
+		}, ackFunc(t)))
+
+		// Give Elasticsearch enough time to persist operations
+		time.Sleep(time.Second)
+
+		require.NoError(t, assertIndexContainsDocuments(t, esClient, []map[string]interface{}{
+			user1,
+			user2,
+			user2,
+		}))
+	})
 }
 
 func TestOperationsWithBiggerBulkSize(t *testing.T) {

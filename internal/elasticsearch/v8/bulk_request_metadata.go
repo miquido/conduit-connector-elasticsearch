@@ -22,7 +22,6 @@ type bulkRequestActionAndMetadata struct {
 
 type bulkRequestCreateAction struct {
 	Index string `json:"_index"`
-	Type  string `json:"_type"`
 }
 
 type bulkRequestUpdateAction struct {

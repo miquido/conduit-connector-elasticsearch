@@ -27,19 +27,8 @@ type bulkResponse struct {
 }
 
 type bulkResponseItem struct {
-	ID string `json:"_id"`
-	// Index   string `json:"_index"`
-	// Type    string `json:"_type,omitempty"`
-	// Version int    `json:"_version,omitempty"`
-	// Result  string `json:"result,omitempty"`
-	// Shards  *struct {
-	// 	Total      int `json:"total"`
-	// 	Successful int `json:"successful"`
-	// 	Failed     int `json:"failed"`
-	// } `json:"_shards,omitempty"`
-	// SeqNo       int `json:"_seq_no,omitempty"`
-	// PrimaryTerm int `json:"_primary_term,omitempty"`
-	Status int `json:"status"`
+	ID     string `json:"_id"`
+	Status int    `json:"status"`
 	Error  *struct {
 		Type     string          `json:"type"`
 		Reason   string          `json:"reason"`

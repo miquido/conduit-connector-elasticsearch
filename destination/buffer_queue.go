@@ -12,17 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v6
+package destination
 
-import "encoding/json"
+import (
+	"sort"
+	"time"
 
-type bulkRequestCreateSource []byte
+	sdk "github.com/conduitio/conduit-connector-sdk"
+)
 
-func (b bulkRequestCreateSource) MarshalJSON() ([]byte, error) {
-	return b, nil
+type operation struct {
+	CreatedAt time.Time
+	Record    sdk.Record
+	AckFunc   sdk.AckFunc
 }
 
-type bulkRequestOptionalSource struct {
-	Doc         json.RawMessage `json:"doc"`
-	DocAsUpsert bool            `json:"doc_as_upsert"`
+type BufferQueue []*operation
+
+func (bq BufferQueue) Len() int {
+	return len(bq)
+}
+
+func (bq *BufferQueue) Enqueue(item *operation) {
+	*bq = append(*bq, item)
+}
+
+func (bq *BufferQueue) Sort() {
+	old := *bq
+
+	sort.SliceStable(old, func(i, j int) bool {
+		return old[j].CreatedAt.Before(old[i].CreatedAt)
+	})
 }
