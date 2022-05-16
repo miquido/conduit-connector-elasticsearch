@@ -109,7 +109,7 @@ func TestParseConfig(t *testing.T) {
 		require.EqualError(t, err, fmt.Sprintf("%q config value must be set", ConfigKeyBulkSize))
 	})
 
-	t.Run("fails when Bulk Size is an invalid positive integer", func(t *testing.T) {
+	t.Run("fails when Bulk Size is negative", func(t *testing.T) {
 		_, err := ParseConfig(map[string]string{
 			ConfigKeyVersion:  elasticsearch.Version8,
 			ConfigKeyHost:     fakerInstance.Internet().URL(),
@@ -145,6 +145,32 @@ func TestParseConfig(t *testing.T) {
 		require.EqualError(t, err, fmt.Sprintf("failed to parse %q config value: value must not be grater than 10 000", ConfigKeyBulkSize))
 	})
 
+	t.Run("fails when Retries is negative", func(t *testing.T) {
+		_, err := ParseConfig(map[string]string{
+			ConfigKeyVersion:  elasticsearch.Version8,
+			ConfigKeyHost:     fakerInstance.Internet().URL(),
+			ConfigKeyIndex:    fakerInstance.Lorem().Word(),
+			ConfigKeyBulkSize: "1",
+			ConfigKeyRetries:  "-1",
+			"nonExistentKey":  "value",
+		})
+
+		require.EqualError(t, err, fmt.Sprintf(`failed to parse %q config value: strconv.ParseUint: parsing "-1": invalid syntax`, ConfigKeyRetries))
+	})
+
+	t.Run("fails when Retries is greater than 255", func(t *testing.T) {
+		_, err := ParseConfig(map[string]string{
+			ConfigKeyVersion:  elasticsearch.Version8,
+			ConfigKeyHost:     fakerInstance.Internet().URL(),
+			ConfigKeyIndex:    fakerInstance.Lorem().Word(),
+			ConfigKeyBulkSize: "1",
+			ConfigKeyRetries:  "256",
+			"nonExistentKey":  "value",
+		})
+
+		require.EqualError(t, err, fmt.Sprintf(`failed to parse %q config value: strconv.ParseUint: parsing "256": value out of range`, ConfigKeyRetries))
+	})
+
 	t.Run("returns config when all required config values were provided", func(t *testing.T) {
 		var cfgRaw = map[string]string{
 			ConfigKeyVersion:  elasticsearch.Version8,
@@ -168,6 +194,7 @@ func TestParseConfig(t *testing.T) {
 		require.Empty(t, "", config.APIKey)
 		require.Empty(t, "", config.ServiceToken)
 		require.Empty(t, "", config.CertificateFingerprint)
+		require.Equal(t, uint8(0), config.Retries)
 	})
 
 	t.Run("returns config when all config values were provided", func(t *testing.T) {
@@ -183,6 +210,7 @@ func TestParseConfig(t *testing.T) {
 			ConfigKeyAPIKey:                 fakerInstance.RandomStringWithLength(32),
 			ConfigKeyServiceToken:           fakerInstance.RandomStringWithLength(32),
 			ConfigKeyCertificateFingerprint: fakerInstance.Hash().SHA256(),
+			ConfigKeyRetries:                fmt.Sprintf("%d", fakerInstance.Int32Between(1, 255)),
 			"nonExistentKey":                "value",
 		}
 
@@ -200,6 +228,7 @@ func TestParseConfig(t *testing.T) {
 		require.Equal(t, cfgRaw[ConfigKeyAPIKey], config.APIKey)
 		require.Equal(t, cfgRaw[ConfigKeyServiceToken], config.ServiceToken)
 		require.Equal(t, cfgRaw[ConfigKeyCertificateFingerprint], config.CertificateFingerprint)
+		require.Equal(t, cfgRaw[ConfigKeyRetries], fmt.Sprintf("%d", config.Retries))
 	})
 }
 

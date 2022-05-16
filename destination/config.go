@@ -34,6 +34,7 @@ const (
 	ConfigKeyIndex                  = "index"
 	ConfigKeyType                   = "type"
 	ConfigKeyBulkSize               = "bulkSize"
+	ConfigKeyRetries                = "retries"
 )
 
 type Config struct {
@@ -48,6 +49,7 @@ type Config struct {
 	Index                  string
 	Type                   string
 	BulkSize               uint64
+	Retries                uint8
 }
 
 func (c Config) GetHost() string {
@@ -86,7 +88,7 @@ func (c Config) GetType() string {
 	return c.Type
 }
 
-func ParseConfig(cfgRaw map[string]string) (Config, error) {
+func ParseConfig(cfgRaw map[string]string) (_ Config, err error) {
 	cfg := Config{
 		Version:                cfgRaw[ConfigKeyVersion],
 		Host:                   cfgRaw[ConfigKeyHost],
@@ -136,12 +138,15 @@ func ParseConfig(cfgRaw map[string]string) (Config, error) {
 		return Config{}, requiredConfigErr(ConfigKeyType)
 	}
 
-	bulkSizeParsed, err := parseBulkSizeConfigValue(cfgRaw)
-	if err != nil {
+	// Bulk size
+	if cfg.BulkSize, err = parseBulkSizeConfigValue(cfgRaw); err != nil {
 		return Config{}, err
 	}
 
-	cfg.BulkSize = bulkSizeParsed
+	// Retries
+	if cfg.Retries, err = parseRetriesConfigValue(cfgRaw); err != nil {
+		return Config{}, err
+	}
 
 	return cfg, nil
 }
@@ -168,4 +173,18 @@ func parseBulkSizeConfigValue(cfgRaw map[string]string) (uint64, error) {
 	}
 
 	return bulkSizeParsed, nil
+}
+
+func parseRetriesConfigValue(cfgRaw map[string]string) (uint8, error) {
+	retries, ok := cfgRaw[ConfigKeyRetries]
+	if !ok || retries == "" {
+		return 0, nil
+	}
+
+	retriesParsed, err := strconv.ParseUint(retries, 10, 8)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse %q config value: %w", ConfigKeyRetries, err)
+	}
+
+	return uint8(retriesParsed), nil
 }

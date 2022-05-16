@@ -29,6 +29,10 @@ type operation struct {
 
 type BufferQueue []*operation
 
+func (bq BufferQueue) Empty() bool {
+	return len(bq) == 0
+}
+
 func (bq BufferQueue) Len() int {
 	return len(bq)
 }
@@ -41,6 +45,6 @@ func (bq *BufferQueue) Sort() {
 	old := *bq
 
 	sort.SliceStable(old, func(i, j int) bool {
-		return old[j].CreatedAt.Before(old[i].CreatedAt)
+		return old[i].CreatedAt.Before(old[j].CreatedAt)
 	})
 }

@@ -88,90 +88,103 @@ func (d *Destination) WriteAsync(ctx context.Context, record sdk.Record, ackFunc
 }
 
 func (d *Destination) Flush(ctx context.Context) error {
-	d.operationsQueue.Sort()
-
-	pendingOperations := d.operationsQueue
-	queueLength := pendingOperations.Len()
-
-	if queueLength == 0 {
+	// check if there are operations in the buffer
+	if d.operationsQueue.Empty() {
 		return nil
 	}
 
-	// failedOperations := make(BufferQueue, 0, queueLength)
+	// Sort operations to ensure the order
+	d.operationsQueue.Sort()
 
-	// Prepare request payload
-	data, err := d.prepareBulkRequestPayload(ctx, pendingOperations)
-	if err != nil {
-		return err
-	}
+	// Execute operations
+	retriesLeft := d.config.Retries
 
-	// Send the bulk request
-	response, err := d.executeBulkRequest(ctx, data)
-	if err != nil {
-		return err
-	}
+	for {
+		// Set up the buffer for failed operations
+		failedOperations := make(BufferQueue, 0, d.operationsQueue.Len())
 
-	// Ack results
-	for n, item := range response.Items {
-		var itemResponse bulkResponseItem
-
-		switch {
-		case item.Create != nil:
-			itemResponse = *item.Create
-
-		case item.Update != nil:
-			itemResponse = *item.Update
-
-		case item.Delete != nil:
-			itemResponse = *item.Delete
-
-		default:
-			sdk.Logger(ctx).Warn().Msg("no update or delete details were found in Elasticsearch response")
-
-			continue
-		}
-
-		// New?
-		ackFunc := pendingOperations[n].AckFunc
-
-		if itemResponse.Status >= 200 && itemResponse.Status < 300 {
-			if err := ackFunc(nil); err != nil {
-				return err
-			}
-
-			continue
-		}
-
-		var operationError error
-
-		if itemResponse.Error == nil {
-			operationError = fmt.Errorf(
-				"item with key=%s create/upsert/delete failure: unknown error",
-				itemResponse.ID,
-			)
-		} else {
-			operationError = fmt.Errorf(
-				"item with key=%s create/upsert/delete failure: [%s] %s: %s",
-				itemResponse.ID,
-				itemResponse.Error.Type,
-				itemResponse.Error.Reason,
-				itemResponse.Error.CausedBy,
-			)
-		}
-
-		if err := ackFunc(operationError); err != nil {
+		// Prepare request payload
+		data, err := d.prepareBulkRequestPayload(ctx)
+		if err != nil {
 			return err
 		}
 
-		// failedOperations = append(failedOperations, pendingOperations[n])
+		// Send the bulk request
+		response, err := d.executeBulkRequest(ctx, data)
+		if err != nil {
+			return err
+		}
 
-		// // Old
-		// if err := d.sendAckForOperation(itemResponse); err != nil {
-		// 	return err
-		// }
+		// Ack results
+		for n, item := range response.Items {
+			// Detect operation result
+			var itemResponse bulkResponseItem
+
+			switch {
+			case item.Create != nil:
+				itemResponse = *item.Create
+
+			case item.Update != nil:
+				itemResponse = *item.Update
+
+			case item.Delete != nil:
+				itemResponse = *item.Delete
+
+			default:
+				sdk.Logger(ctx).Warn().Msg("no update or delete details were found in Elasticsearch response")
+
+				continue
+			}
+
+			// ACK
+			// The order of responses is the same as the order of requests
+			// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html#bulk-api-response-body
+			ackFunc := d.operationsQueue[n].AckFunc
+
+			if itemResponse.Status >= 200 && itemResponse.Status < 300 {
+				if err := ackFunc(nil); err != nil {
+					return err
+				}
+
+				continue
+			}
+
+			var operationError error
+
+			if itemResponse.Error == nil {
+				operationError = fmt.Errorf(
+					"item with key=%s create/upsert/delete failure: unknown error",
+					itemResponse.ID,
+				)
+			} else {
+				operationError = fmt.Errorf(
+					"item with key=%s create/upsert/delete failure: [%s] %s: %s",
+					itemResponse.ID,
+					itemResponse.Error.Type,
+					itemResponse.Error.Reason,
+					itemResponse.Error.CausedBy,
+				)
+			}
+
+			if err := ackFunc(operationError); err != nil {
+				return err
+			}
+
+			failedOperations.Enqueue(d.operationsQueue[n])
+		}
+
+		// Check if retry logic is enabled and there are operations to retry
+		if retriesLeft == 0 || failedOperations.Len() == 0 {
+			break
+		}
+
+		// Set up for retry
+		retriesLeft--
+
+		d.operationsQueue = failedOperations // No need to sort since d.operationsQueue is already sorted
 	}
 
-	// Reset buffers
+	// Reset buffer
 	d.operationsQueue = make(BufferQueue, 0, d.config.BulkSize)
 
 	return nil
@@ -181,10 +194,10 @@ func (d *Destination) Teardown(context.Context) error {
 	return nil // No close routine needed
 }
 
-func (d *Destination) prepareBulkRequestPayload(ctx context.Context, pendingOperations BufferQueue) (*bytes.Buffer, error) {
+func (d *Destination) prepareBulkRequestPayload(ctx context.Context) (*bytes.Buffer, error) {
 	data := &bytes.Buffer{}
 
-	for _, item := range pendingOperations {
+	for _, item := range d.operationsQueue {
 		record := item.Record
 		action := record.Metadata["action"]
 

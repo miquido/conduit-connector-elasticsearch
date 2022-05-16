@@ -81,6 +81,11 @@ func Specification() sdk.Specification {
 				Required:    true,
 				Description: "The maximum size of operations sent to Elasticsearch server.",
 			},
+			destination.ConfigKeyRetries: {
+				Default:     "0",
+				Required:    true,
+				Description: "The maximum number of retries of failed operations. 0 disables retries logic.",
+			},
 		},
 		SourceParams: map[string]sdk.Parameter{
 			//
