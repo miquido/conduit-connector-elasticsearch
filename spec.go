@@ -28,7 +28,7 @@ func Specification() sdk.Specification {
 		DestinationParams: map[string]sdk.Parameter{
 			destination.ConfigKeyVersion: {
 				Default:     "",
-				Required:    false,
+				Required:    true,
 				Description: "The version of the Elasticsearch service.",
 			},
 			destination.ConfigKeyHost: {
