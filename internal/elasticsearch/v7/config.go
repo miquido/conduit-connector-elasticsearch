@@ -14,6 +14,7 @@
 
 package v7
 
+//go:generate moq -out config_moq_test.go . config
 type config interface {
 	GetHost() string
 	GetUsername() string
