@@ -23,6 +23,7 @@ type bulkResponse struct {
 }
 
 type bulkResponseItems struct {
+	Index  *bulkResponseItem `json:"index,omitempty"`
 	Create *bulkResponseItem `json:"create,omitempty"`
 	Update *bulkResponseItem `json:"update,omitempty"`
 	Delete *bulkResponseItem `json:"delete,omitempty"`

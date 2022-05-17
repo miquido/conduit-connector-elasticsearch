@@ -16,6 +16,7 @@ package v6
 
 import "encoding/json"
 
+// See: https://www.elastic.co/guide/en/elasticsearch/reference/6.8/docs-bulk.html
 type bulkRequestCreateSource []byte
 
 func (b bulkRequestCreateSource) MarshalJSON() ([]byte, error) {

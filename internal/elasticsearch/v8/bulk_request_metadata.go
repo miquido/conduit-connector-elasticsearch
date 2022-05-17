@@ -14,6 +14,7 @@
 
 package v8
 
+// See: https://www.elastic.co/guide/en/elasticsearch/reference/8.2/docs-bulk.html
 type bulkRequestActionAndMetadata struct {
 	Create *bulkRequestCreateAction `json:"create,omitempty"`
 	Update *bulkRequestUpdateAction `json:"update,omitempty"`

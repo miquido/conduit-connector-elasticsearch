@@ -124,6 +124,9 @@ func (d *Destination) Flush(ctx context.Context) error {
 			var itemResponse bulkResponseItem
 
 			switch {
+			case item.Index != nil:
+				itemResponse = *item.Index
+
 			case item.Create != nil:
 				itemResponse = *item.Create
 

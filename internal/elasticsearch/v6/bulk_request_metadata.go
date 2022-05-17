@@ -14,13 +14,14 @@
 
 package v6
 
+// See: https://www.elastic.co/guide/en/elasticsearch/reference/6.8/docs-bulk.html
 type bulkRequestActionAndMetadata struct {
-	Create *bulkRequestCreateAction `json:"create,omitempty"`
+	Index  *bulkRequestIndexAction  `json:"index,omitempty"`
 	Update *bulkRequestUpdateAction `json:"update,omitempty"`
 	Delete *bulkRequestDeleteAction `json:"delete,omitempty"`
 }
 
-type bulkRequestCreateAction struct {
+type bulkRequestIndexAction struct {
 	Index string `json:"_index"`
 	Type  string `json:"_type"`
 }

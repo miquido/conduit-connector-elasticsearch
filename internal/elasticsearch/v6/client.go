@@ -96,7 +96,7 @@ func (c *Client) Bulk(ctx context.Context, reader io.Reader) (io.ReadCloser, err
 func (c *Client) PrepareCreateOperation(item sdk.Record) (interface{}, interface{}, error) {
 	// Prepare metadata
 	metadata := bulkRequestActionAndMetadata{
-		Create: &bulkRequestCreateAction{
+		Index: &bulkRequestIndexAction{
 			Index: c.cfg.GetIndex(),
 			Type:  c.cfg.GetType(),
 		},
