@@ -53,6 +53,7 @@ type Client struct {
 	cfg config
 }
 
+// GetClient returns Elasticsearch v6 client.
 func (c *Client) GetClient() *elasticsearch.Client {
 	return c.es
 }
@@ -148,6 +149,7 @@ func (c *Client) PrepareDeleteOperation(key string) (interface{}, error) {
 	}, nil
 }
 
+// preparePayload encodes Record's payload as JSON.
 func preparePayload(item *sdk.Record) (json.RawMessage, error) {
 	switch itemPayload := item.Payload.(type) {
 	case sdk.StructuredData:

@@ -30,18 +30,22 @@ type operation struct {
 
 type BufferQueue []*operation
 
+// Empty returns whether queue is empty or not.
 func (bq BufferQueue) Empty() bool {
 	return len(bq) == 0
 }
 
+// Len returns the current number of elements in queue.
 func (bq BufferQueue) Len() int {
 	return len(bq)
 }
 
+// Enqueue adds registers a new operation in queue.
 func (bq *BufferQueue) Enqueue(item *operation) {
 	*bq = append(*bq, item)
 }
 
+// Sort organizes queue operations by their CreatedAt property in ascending order.
 func (bq *BufferQueue) Sort() {
 	old := *bq
 

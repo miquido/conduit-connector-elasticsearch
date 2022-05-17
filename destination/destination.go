@@ -52,6 +52,7 @@ const (
 //go:generate moq -out client_moq_test.go . client
 type client = elasticsearch.Client
 
+// GetClient returns the current Elasticsearch client
 func (d *Destination) GetClient() elasticsearch.Client {
 	return d.client
 }
@@ -215,6 +216,7 @@ func (d *Destination) Teardown(context.Context) error {
 	return nil // No close routine needed
 }
 
+// prepareBulkRequestPayload converts all pending operations into a valid Elasticsearch Bulk API request.
 func (d *Destination) prepareBulkRequestPayload(ctx context.Context) (*bytes.Buffer, error) {
 	data := &bytes.Buffer{}
 
@@ -260,6 +262,7 @@ func (d *Destination) prepareBulkRequestPayload(ctx context.Context) (*bytes.Buf
 	return data, nil
 }
 
+// writeInsertOperation adds create new Document without ID request into Bulk API request
 func (d *Destination) writeInsertOperation(data *bytes.Buffer, item sdk.Record) error {
 	jsonEncoder := json.NewEncoder(data)
 
@@ -282,6 +285,7 @@ func (d *Destination) writeInsertOperation(data *bytes.Buffer, item sdk.Record) 
 	return nil
 }
 
+// writeUpsertOperation adds upsert a Document with ID request into Bulk API request
 func (d *Destination) writeUpsertOperation(key string, data *bytes.Buffer, item sdk.Record) error {
 	jsonEncoder := json.NewEncoder(data)
 
@@ -304,6 +308,7 @@ func (d *Destination) writeUpsertOperation(key string, data *bytes.Buffer, item 
 	return nil
 }
 
+// writeDeleteOperation adds delete a Document by ID request into Bulk API request
 func (d *Destination) writeDeleteOperation(key string, data *bytes.Buffer) error {
 	jsonEncoder := json.NewEncoder(data)
 
@@ -321,6 +326,7 @@ func (d *Destination) writeDeleteOperation(key string, data *bytes.Buffer) error
 	return nil
 }
 
+// executeBulkRequest executes Bulk API request and parses the response
 func (d *Destination) executeBulkRequest(ctx context.Context, data *bytes.Buffer) (bulkResponse, error) {
 	// Check if there is any job to do
 	if data.Len() < 1 {
