@@ -74,17 +74,17 @@ func Specification() sdk.Specification {
 			destination.ConfigKeyType: {
 				Default:     "",
 				Required:    false,
-				Description: "The name of the index's type to write the data to. Required when version is 6.",
+				Description: "The name of the index's type to write the data to.",
 			},
 			destination.ConfigKeyBulkSize: {
 				Default:     "1000",
 				Required:    true,
-				Description: "The maximum size of operations sent to Elasticsearch server.",
+				Description: "The number of items stored in bulk in the index. The minimum value is `1`, maximum value is `10 000`.",
 			},
 			destination.ConfigKeyRetries: {
 				Default:     "0",
 				Required:    true,
-				Description: "The maximum number of retries of failed operations. 0 disables retries logic.",
+				Description: "The maximum number of retries of failed operations. The minimum value is `0` which disabled retry logic. The maximum value is `255.",
 			},
 		},
 		SourceParams: map[string]sdk.Parameter{
