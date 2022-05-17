@@ -39,6 +39,16 @@ type Destination struct {
 	operationsQueue BufferQueue
 }
 
+const (
+	actionInsert  = "insert"
+	actionCreate  = "create"
+	actionCreated = "created"
+	actionUpdate  = "update"
+	actionUpdated = "updated"
+	actionDelete  = "delete"
+	actionDeleted = "deleted"
+)
+
 //go:generate moq -out client_moq_test.go . client
 type client = elasticsearch.Client
 
@@ -218,24 +228,24 @@ func (d *Destination) prepareBulkRequestPayload(ctx context.Context) (*bytes.Buf
 		}
 
 		if key == "" {
-			action = "insert"
+			action = actionInsert
 		} else if action == "" {
-			action = "create"
+			action = actionCreate
 		}
 
 		switch action {
-		case "insert":
+		case actionInsert:
 			if err := d.writeInsertOperation(data, record); err != nil {
 				return nil, err
 			}
 
-		case "create", "created",
-			"update", "updated":
+		case actionCreate, actionCreated,
+			actionUpdate, actionUpdated:
 			if err := d.writeUpsertOperation(key, data, record); err != nil {
 				return nil, err
 			}
 
-		case "delete", "deleted":
+		case actionDelete, actionDeleted:
 			if err := d.writeDeleteOperation(key, data); err != nil {
 				return nil, err
 			}
