@@ -34,10 +34,13 @@ type Destination struct {
 	sdk.UnimplementedDestination
 
 	config          Config
-	client          elasticsearch.Client
+	client          client
 	mutex           sync.Mutex
 	operationsQueue BufferQueue
 }
+
+//go:generate moq -out client_moq_test.go . client
+type client = elasticsearch.Client
 
 func (d *Destination) GetClient() elasticsearch.Client {
 	return d.client
@@ -149,15 +152,13 @@ func (d *Destination) Flush(ctx context.Context) error {
 				continue
 			}
 
-			var operationError error
-
 			if itemResponse.Error == nil {
-				operationError = fmt.Errorf(
+				d.operationsQueue[n].err = fmt.Errorf(
 					"item with key=%s create/upsert/delete failure: unknown error",
 					itemResponse.ID,
 				)
 			} else {
-				operationError = fmt.Errorf(
+				d.operationsQueue[n].err = fmt.Errorf(
 					"item with key=%s create/upsert/delete failure: [%s] %s: %s",
 					itemResponse.ID,
 					itemResponse.Error.Type,
@@ -166,15 +167,22 @@ func (d *Destination) Flush(ctx context.Context) error {
 				)
 			}
 
-			if err := ackFunc(operationError); err != nil {
-				return err
-			}
-
 			failedOperations.Enqueue(d.operationsQueue[n])
 		}
 
-		// Check if retry logic is enabled and there are operations to retry
-		if retriesLeft == 0 || failedOperations.Len() == 0 {
+		// Fail pending operations when retries limit is reached
+		if retriesLeft == 0 {
+			for _, failedOperation := range failedOperations {
+				if err := failedOperation.AckFunc(failedOperation.err); err != nil {
+					return err
+				}
+			}
+
+			break
+		}
+
+		// Check if there are operations to retry
+		if failedOperations.Len() == 0 {
 			break
 		}
 

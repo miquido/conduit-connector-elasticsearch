@@ -156,6 +156,10 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 				"id":    float64(fakerInstance.Int32Between(201, 300)),
 				"email": fakerInstance.Internet().Email(),
 			}
+			user3 = map[string]interface{}{
+				"id":    float64(fakerInstance.Int32Between(301, 400)),
+				"email": fakerInstance.Internet().Email(),
+			}
 		)
 
 		t.Run("can be upserted", func(t *testing.T) {
@@ -234,6 +238,18 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 				Key:       nil,
 				CreatedAt: time.Now(),
 			}, ackFunc(t)))
+			require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
+				Metadata: map[string]string{
+					"action": "",
+				},
+				Payload: sdk.RawData(fmt.Sprintf(
+					`{"id":%.f,"email":%q}`,
+					user3["id"],
+					user3["email"],
+				)),
+				Key:       sdk.RawData(fmt.Sprintf("%.0f", user3["id"])),
+				CreatedAt: time.Now(),
+			}, ackFunc(t)))
 
 			// Give Elasticsearch enough time to persist operations
 			time.Sleep(time.Second)
@@ -242,6 +258,7 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 				user1,
 				user2,
 				user2,
+				user3,
 			}))
 		})
 	})

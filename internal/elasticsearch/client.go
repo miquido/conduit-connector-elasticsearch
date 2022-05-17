@@ -22,7 +22,6 @@ import (
 )
 
 // Client describes Elasticsearch client interface
-//go:generate moq -out client_moq_test.go . Client
 type Client interface {
 	// Ping executes Elasticsearch ping request.
 	// See: https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html

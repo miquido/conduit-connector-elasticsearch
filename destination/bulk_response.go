@@ -17,21 +17,25 @@ package destination
 import "encoding/json"
 
 type bulkResponse struct {
-	Took   int  `json:"took"`
-	Errors bool `json:"errors"`
-	Items  []struct {
-		Create *bulkResponseItem `json:"create,omitempty"`
-		Update *bulkResponseItem `json:"update,omitempty"`
-		Delete *bulkResponseItem `json:"delete,omitempty"`
-	} `json:"items"`
+	Took   int                 `json:"took"`
+	Errors bool                `json:"errors"`
+	Items  []bulkResponseItems `json:"items"`
+}
+
+type bulkResponseItems struct {
+	Create *bulkResponseItem `json:"create,omitempty"`
+	Update *bulkResponseItem `json:"update,omitempty"`
+	Delete *bulkResponseItem `json:"delete,omitempty"`
 }
 
 type bulkResponseItem struct {
-	ID     string `json:"_id"`
-	Status int    `json:"status"`
-	Error  *struct {
-		Type     string          `json:"type"`
-		Reason   string          `json:"reason"`
-		CausedBy json.RawMessage `json:"caused_by"`
-	} `json:"error,omitempty"`
+	ID     string                 `json:"_id"`
+	Status int                    `json:"status"`
+	Error  *bulkResponseItemError `json:"error,omitempty"`
+}
+
+type bulkResponseItemError struct {
+	Type     string          `json:"type"`
+	Reason   string          `json:"reason"`
+	CausedBy json.RawMessage `json:"caused_by"`
 }
