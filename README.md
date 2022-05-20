@@ -1,7 +1,7 @@
 # Conduit Connector Elasticsearch
 
 ## General
-The Elasticsearch plugin is one of [Conduit](https://github.com/ConduitIO/conduit) builtin plugins.
+The Elasticsearch plugin is one of [Conduit](https://github.com/ConduitIO/conduit) plugins.
 It currently provides only destination Elasticsearch connector, allowing for using it as a destination in a Conduit pipeline.
 
 ## How to build it
