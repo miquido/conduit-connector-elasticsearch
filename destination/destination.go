@@ -142,22 +142,27 @@ func (d *Destination) Flush(ctx context.Context) error {
 		for n, item := range response.Items {
 			// Detect operation result
 			var itemResponse bulkResponseItem
+			var operationType string
 
 			switch {
 			case item.Index != nil:
 				itemResponse = *item.Index
+				operationType = "index"
 
 			case item.Create != nil:
 				itemResponse = *item.Create
+				operationType = "create"
 
 			case item.Update != nil:
 				itemResponse = *item.Update
+				operationType = "update"
 
 			case item.Delete != nil:
 				itemResponse = *item.Delete
+				operationType = "delete"
 
 			default:
-				sdk.Logger(ctx).Warn().Msg("no update or delete details were found in Elasticsearch response")
+				sdk.Logger(ctx).Warn().Msg("no index, create, update or delete details were found in Elasticsearch response")
 
 				continue
 			}
@@ -177,13 +182,15 @@ func (d *Destination) Flush(ctx context.Context) error {
 
 			if itemResponse.Error == nil {
 				d.operationsQueue[n].err = fmt.Errorf(
-					"item with key=%s create/upsert/delete failure: unknown error",
+					"item with key=%s %s failure: unknown error",
 					itemResponse.ID,
+					operationType,
 				)
 			} else {
 				d.operationsQueue[n].err = fmt.Errorf(
-					"item with key=%s create/upsert/delete failure: [%s] %s: %s",
+					"item with key=%s %s failure: [%s] %s: %s",
 					itemResponse.ID,
+					operationType,
 					itemResponse.Error.Type,
 					itemResponse.Error.Reason,
 					itemResponse.Error.CausedBy,

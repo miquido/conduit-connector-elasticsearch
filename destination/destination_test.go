@@ -312,7 +312,7 @@ func TestDestination_Flush(t *testing.T) {
 		destination.operationsQueue.Enqueue(&operation{
 			CreatedAt: record2.CreatedAt,
 			Record:    record2,
-			AckFunc:   unsuccessfulAckFunc(t, fmt.Sprintf("item with key= create/upsert/delete failure: [%s] %s: %q", "foo", "bar", "baz")),
+			AckFunc:   unsuccessfulAckFunc(t, fmt.Sprintf("item with key= create failure: [%s] %s: %q", "foo", "bar", "baz")),
 		})
 
 		destination.operationsQueue.Enqueue(&operation{
