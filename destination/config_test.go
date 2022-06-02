@@ -26,67 +26,140 @@ import (
 func TestParseConfig(t *testing.T) {
 	fakerInstance := faker.New()
 
-	t.Run("fails when Version is empty", func(t *testing.T) {
-		_, err := ParseConfig(map[string]string{
-			"nonExistentKey": "value",
+	for _, tt := range []struct {
+		name  string
+		error string
+		cfg   map[string]string
+	}{
+		{
+			name:  "Version is empty",
+			error: fmt.Sprintf("%q config value must be set", ConfigKeyVersion),
+			cfg: map[string]string{
+				"nonExistentKey": "value",
+			},
+		},
+		{
+			name: "Version is unsupported",
+			error: fmt.Sprintf(
+				"%q config value must be one of [%s, %s, %s, %s], invalid-version provided",
+				ConfigKeyVersion,
+				elasticsearch.Version5,
+				elasticsearch.Version6,
+				elasticsearch.Version7,
+				elasticsearch.Version8,
+			),
+			cfg: map[string]string{
+				ConfigKeyVersion: "invalid-version",
+				"nonExistentKey": "value",
+			},
+		},
+		{
+			name:  "Host is empty",
+			error: fmt.Sprintf("%q config value must be set", ConfigKeyHost),
+			cfg: map[string]string{
+				ConfigKeyVersion: elasticsearch.Version6,
+				"nonExistentKey": "value",
+			},
+		},
+		{
+			name:  "Password is provided but Username is empty",
+			error: fmt.Sprintf("%q config value must be set when %q is provided", ConfigKeyUsername, ConfigKeyPassword),
+			cfg: map[string]string{
+				ConfigKeyVersion:  elasticsearch.Version6,
+				ConfigKeyHost:     fakerInstance.Internet().URL(),
+				ConfigKeyPassword: fakerInstance.Internet().Password(),
+				"nonExistentKey":  "value",
+			},
+		},
+		{
+			name:  "Index is empty",
+			error: fmt.Sprintf("%q config value must be set", ConfigKeyIndex),
+			cfg: map[string]string{
+				ConfigKeyVersion: elasticsearch.Version6,
+				ConfigKeyHost:    fakerInstance.Internet().URL(),
+				"nonExistentKey": "value",
+			},
+		},
+		{
+			name:  "Bulk Size is empty",
+			error: fmt.Sprintf("%q config value must be set", ConfigKeyBulkSize),
+			cfg: map[string]string{
+				ConfigKeyVersion: elasticsearch.Version8,
+				ConfigKeyHost:    fakerInstance.Internet().URL(),
+				ConfigKeyIndex:   fakerInstance.Lorem().Word(),
+				"nonExistentKey": "value",
+			},
+		},
+		{
+			name:  "Bulk Size is negative",
+			error: fmt.Sprintf(`failed to parse %q config value: strconv.ParseUint: parsing "-1": invalid syntax`, ConfigKeyBulkSize),
+			cfg: map[string]string{
+				ConfigKeyVersion:  elasticsearch.Version8,
+				ConfigKeyHost:     fakerInstance.Internet().URL(),
+				ConfigKeyIndex:    fakerInstance.Lorem().Word(),
+				ConfigKeyBulkSize: "-1",
+				"nonExistentKey":  "value",
+			},
+		},
+		{
+			name:  "Bulk Size is less than 1",
+			error: fmt.Sprintf("failed to parse %q config value: value must be greater than 0", ConfigKeyBulkSize),
+			cfg: map[string]string{
+				ConfigKeyVersion:  elasticsearch.Version8,
+				ConfigKeyHost:     fakerInstance.Internet().URL(),
+				ConfigKeyIndex:    fakerInstance.Lorem().Word(),
+				ConfigKeyBulkSize: "0",
+				"nonExistentKey":  "value",
+			},
+		},
+		{
+			name:  "Bulk Size is greater than 10 000",
+			error: fmt.Sprintf("failed to parse %q config value: value must not be grater than 10 000", ConfigKeyBulkSize),
+			cfg: map[string]string{
+				ConfigKeyVersion:  elasticsearch.Version8,
+				ConfigKeyHost:     fakerInstance.Internet().URL(),
+				ConfigKeyIndex:    fakerInstance.Lorem().Word(),
+				ConfigKeyBulkSize: "10001",
+				"nonExistentKey":  "value",
+			},
+		},
+		{
+			name:  "Retries is negative",
+			error: fmt.Sprintf(`failed to parse %q config value: strconv.ParseUint: parsing "-1": invalid syntax`, ConfigKeyRetries),
+			cfg: map[string]string{
+				ConfigKeyVersion:  elasticsearch.Version8,
+				ConfigKeyHost:     fakerInstance.Internet().URL(),
+				ConfigKeyIndex:    fakerInstance.Lorem().Word(),
+				ConfigKeyBulkSize: "1",
+				ConfigKeyRetries:  "-1",
+				"nonExistentKey":  "value",
+			},
+		},
+		{
+			name:  "Retries is greater than 255",
+			error: fmt.Sprintf(`failed to parse %q config value: strconv.ParseUint: parsing "256": value out of range`, ConfigKeyRetries),
+			cfg: map[string]string{
+				ConfigKeyVersion:  elasticsearch.Version8,
+				ConfigKeyHost:     fakerInstance.Internet().URL(),
+				ConfigKeyIndex:    fakerInstance.Lorem().Word(),
+				ConfigKeyBulkSize: "1",
+				ConfigKeyRetries:  "256",
+				"nonExistentKey":  "value",
+			},
+		},
+	} {
+		t.Run(fmt.Sprintf("Fails when: %s", tt.name), func(t *testing.T) {
+			_, err := ParseConfig(tt.cfg)
+
+			require.EqualError(t, err, tt.error)
 		})
-
-		require.EqualError(t, err, fmt.Sprintf("%q config value must be set", ConfigKeyVersion))
-	})
-
-	t.Run("fails when Version is unsupported", func(t *testing.T) {
-		var version = "invalid-version"
-
-		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion: version,
-			"nonExistentKey": "value",
-		})
-
-		require.EqualError(t, err, fmt.Sprintf(
-			"%q config value must be one of [%s, %s, %s, %s], %s provided",
-			ConfigKeyVersion,
-			elasticsearch.Version5,
-			elasticsearch.Version6,
-			elasticsearch.Version7,
-			elasticsearch.Version8,
-			version,
-		))
-	})
-
-	t.Run("fails when Host is empty", func(t *testing.T) {
-		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion: elasticsearch.Version6,
-			"nonExistentKey": "value",
-		})
-
-		require.EqualError(t, err, fmt.Sprintf("%q config value must be set", ConfigKeyHost))
-	})
-
-	t.Run("fails when Password is provided but Username is empty", func(t *testing.T) {
-		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version6,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyPassword: fakerInstance.Internet().Password(),
-			"nonExistentKey":  "value",
-		})
-
-		require.EqualError(t, err, fmt.Sprintf("%q config value must be set when %q is provided", ConfigKeyUsername, ConfigKeyPassword))
-	})
-
-	t.Run("fails when Index is empty", func(t *testing.T) {
-		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion: elasticsearch.Version6,
-			ConfigKeyHost:    fakerInstance.Internet().URL(),
-			"nonExistentKey": "value",
-		})
-
-		require.EqualError(t, err, fmt.Sprintf("%q config value must be set", ConfigKeyIndex))
-	})
+	}
 
 	for _, version := range []elasticsearch.Version{
+		elasticsearch.Version5,
 		elasticsearch.Version6,
 	} {
-		t.Run(fmt.Sprintf("fails when Type is empty for Version=%s", version), func(t *testing.T) {
+		t.Run(fmt.Sprintf("Fails when Type is empty for Version=%s", version), func(t *testing.T) {
 			_, err := ParseConfig(map[string]string{
 				ConfigKeyVersion: version,
 				ConfigKeyHost:    fakerInstance.Internet().URL(),
@@ -98,80 +171,7 @@ func TestParseConfig(t *testing.T) {
 		})
 	}
 
-	t.Run("fails when Bulk Size is empty", func(t *testing.T) {
-		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion: elasticsearch.Version8,
-			ConfigKeyHost:    fakerInstance.Internet().URL(),
-			ConfigKeyIndex:   fakerInstance.Lorem().Word(),
-			"nonExistentKey": "value",
-		})
-
-		require.EqualError(t, err, fmt.Sprintf("%q config value must be set", ConfigKeyBulkSize))
-	})
-
-	t.Run("fails when Bulk Size is negative", func(t *testing.T) {
-		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version8,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyIndex:    fakerInstance.Lorem().Word(),
-			ConfigKeyBulkSize: "-1",
-			"nonExistentKey":  "value",
-		})
-
-		require.EqualError(t, err, fmt.Sprintf(`failed to parse %q config value: strconv.ParseUint: parsing "-1": invalid syntax`, ConfigKeyBulkSize))
-	})
-
-	t.Run("fails when Bulk Size is less than 1", func(t *testing.T) {
-		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version8,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyIndex:    fakerInstance.Lorem().Word(),
-			ConfigKeyBulkSize: "0",
-			"nonExistentKey":  "value",
-		})
-
-		require.EqualError(t, err, fmt.Sprintf("failed to parse %q config value: value must be greater than 0", ConfigKeyBulkSize))
-	})
-
-	t.Run("fails when Bulk Size is greater than 10 000", func(t *testing.T) {
-		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version8,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyIndex:    fakerInstance.Lorem().Word(),
-			ConfigKeyBulkSize: "10001",
-			"nonExistentKey":  "value",
-		})
-
-		require.EqualError(t, err, fmt.Sprintf("failed to parse %q config value: value must not be grater than 10 000", ConfigKeyBulkSize))
-	})
-
-	t.Run("fails when Retries is negative", func(t *testing.T) {
-		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version8,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyIndex:    fakerInstance.Lorem().Word(),
-			ConfigKeyBulkSize: "1",
-			ConfigKeyRetries:  "-1",
-			"nonExistentKey":  "value",
-		})
-
-		require.EqualError(t, err, fmt.Sprintf(`failed to parse %q config value: strconv.ParseUint: parsing "-1": invalid syntax`, ConfigKeyRetries))
-	})
-
-	t.Run("fails when Retries is greater than 255", func(t *testing.T) {
-		_, err := ParseConfig(map[string]string{
-			ConfigKeyVersion:  elasticsearch.Version8,
-			ConfigKeyHost:     fakerInstance.Internet().URL(),
-			ConfigKeyIndex:    fakerInstance.Lorem().Word(),
-			ConfigKeyBulkSize: "1",
-			ConfigKeyRetries:  "256",
-			"nonExistentKey":  "value",
-		})
-
-		require.EqualError(t, err, fmt.Sprintf(`failed to parse %q config value: strconv.ParseUint: parsing "256": value out of range`, ConfigKeyRetries))
-	})
-
-	t.Run("returns config when all required config values were provided", func(t *testing.T) {
+	t.Run("Returns config when all required config values were provided", func(t *testing.T) {
 		var cfgRaw = map[string]string{
 			ConfigKeyVersion:  elasticsearch.Version8,
 			ConfigKeyHost:     fakerInstance.Internet().URL(),
@@ -197,7 +197,7 @@ func TestParseConfig(t *testing.T) {
 		require.Equal(t, uint8(0), config.Retries)
 	})
 
-	t.Run("returns config when all config values were provided", func(t *testing.T) {
+	t.Run("Returns config when all config values were provided", func(t *testing.T) {
 		var cfgRaw = map[string]string{
 			ConfigKeyVersion:                elasticsearch.Version8,
 			ConfigKeyHost:                   fakerInstance.Internet().URL(),
