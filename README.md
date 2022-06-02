@@ -7,10 +7,6 @@ It currently provides only destination Elasticsearch connector, allowing for usi
 ## How to build it
 Run `make`.
 
-# Source
-
-Not supported.
-
 # Destination
 
 The Destination connector stores data in given index.
