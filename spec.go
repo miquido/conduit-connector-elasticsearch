@@ -15,8 +15,11 @@
 package elasticsearch
 
 import (
+	"fmt"
+
 	sdk "github.com/conduitio/conduit-connector-sdk"
 	"github.com/miquido/conduit-connector-elasticsearch/destination"
+	"github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch"
 )
 
 func Specification() sdk.Specification {
@@ -27,9 +30,15 @@ func Specification() sdk.Specification {
 		Author:  "Miquido",
 		DestinationParams: map[string]sdk.Parameter{
 			destination.ConfigKeyVersion: {
-				Default:     "",
-				Required:    true,
-				Description: "The version of the Elasticsearch service.",
+				Default:  "",
+				Required: true,
+				Description: fmt.Sprintf(
+					"The version of the Elasticsearch service. One of: %s, %s, %s, %s",
+					elasticsearch.Version5,
+					elasticsearch.Version6,
+					elasticsearch.Version7,
+					elasticsearch.Version8,
+				),
 			},
 			destination.ConfigKeyHost: {
 				Default:     "",
