@@ -39,6 +39,20 @@ For any other action a warning entry is added to log and Record is skipped.
 
 Run `make test` to run all the unit and integration tests, which require Docker to be installed and running. The command will handle starting and stopping docker containers for you.
 
+# Local development
+
+If you like to monitor Elasticsearch index with visual editor, there is [Kibana](https://www.elastic.co/kibana/) configuration created for local development that you can run with Elasticsearch Docker container.
+
+```shell
+docker-compose -f test/docker-compose.v8.overrides.yml -f test/docker-compose.v8.yml -p test-v8 up -d
+```
+
+Don't forget to include it when finishing your work:
+
+```shell
+docker-compose -f test/docker-compose.v8.overrides.yml -f test/docker-compose.v8.yml down
+```
+
 # References
 
 - https://github.com/elastic/go-elasticsearch
