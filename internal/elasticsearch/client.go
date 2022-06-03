@@ -31,12 +31,12 @@ type Client interface {
 	// See: https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
 	Bulk(ctx context.Context, reader io.Reader) (io.ReadCloser, error)
 
-	// PrepareCreateOperation prepares insert operation definition
+	// PrepareCreateOperation prepares insert operation definition for Bulk API query.
 	PrepareCreateOperation(item sdk.Record) (metadata interface{}, payload interface{}, err error)
 
-	// PrepareUpsertOperation prepares upsert operation definition
+	// PrepareUpsertOperation prepares upsert operation definition for Bulk API query.
 	PrepareUpsertOperation(key string, item sdk.Record) (metadata interface{}, payload interface{}, err error)
 
-	// PrepareDeleteOperation prepares delete operation definition
+	// PrepareDeleteOperation prepares delete operation definition for Bulk API query.
 	PrepareDeleteOperation(key string) (metadata interface{}, err error)
 }
