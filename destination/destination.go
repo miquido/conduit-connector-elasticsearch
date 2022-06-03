@@ -39,6 +39,11 @@ type Destination struct {
 	operationsQueue BufferQueue
 }
 
+// Below is a list of all supported operations.
+// These come from Record's Metadata["action"] field, and they instruct the connector how the Record should be handled.
+// Some actions come in different flavour, e.g. "create" and "created". They mean the same action, but aim to support
+// as many different naming conventions as possible.
+// This can be dropped once standardised.
 const (
 	actionInsert  = "insert"
 	actionCreate  = "create"
