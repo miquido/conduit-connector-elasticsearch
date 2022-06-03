@@ -16,14 +16,14 @@ Moreover, when Record has `action` entry in the Metadata, then action specified 
 - `create`, `created`, `update`, `updated`: stores or updates (upsert) a Document with ID. Default case when `action` is not set but Record.Key is set.
 - `delete`, `deleted`: deletes a Document by its Record.Key.
 
-For any other action a warning entry is added to logs and Record is skipped.
+For any other action a warning entry is added to log and Record is skipped.
 
 ## Configuration Options
 
 | name                     | description                                                                                                                                                                                                                                      | required                                             | default  |
 |--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------|----------|
 | `version`                | The version of the Elasticsearch service. One of: `5`, `6`, `7`, `8`.                                                                                                                                                                            | `true`                                               |          |
-| `host`                   | The Elasticsearh host and port (e.g.: http://127.0.0.1:9200).                                                                                                                                                                                    | `true`                                               |          |
+| `host`                   | The Elasticsearch host and port (e.g.: http://127.0.0.1:9200).                                                                                                                                                                                   | `true`                                               |          |
 | `username`               | [v: 5, 6, 7, 8] The username for HTTP Basic Authentication.                                                                                                                                                                                      | `false`                                              |          |
 | `password`               | [v: 5, 6, 7, 8] The password for HTTP Basic Authentication.                                                                                                                                                                                      | `true` when username was provided, `false` otherwise |          |
 | `cloudId`                | [v: 6, 7, 8] Endpoint for the Elastic Service (https://elastic.co/cloud).                                                                                                                                                                        | `false`                                              |          |
