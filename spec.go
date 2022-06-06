@@ -43,7 +43,7 @@ func Specification() sdk.Specification {
 			destination.ConfigKeyHost: {
 				Default:     "",
 				Required:    true,
-				Description: "The Elasticsearh host and port (e.g.: http://127.0.0.1:9200).",
+				Description: "The Elasticsearch host and port (e.g.: http://127.0.0.1:9200).",
 			},
 			destination.ConfigKeyUsername: {
 				Default:     "",
