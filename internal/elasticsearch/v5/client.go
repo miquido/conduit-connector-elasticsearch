@@ -79,7 +79,9 @@ func (c *Client) Bulk(ctx context.Context, reader io.Reader) (io.ReadCloser, err
 			return nil, fmt.Errorf("failed to read the result: %w", err)
 		}
 
-		defer result.Body.Close()
+		if err := result.Body.Close(); err != nil {
+			return nil, fmt.Errorf("failed to read the result: %w", err)
+		}
 
 		var errorDetails ErrorResponse
 		if err := json.Unmarshal(bodyContents, &errorDetails); err != nil {

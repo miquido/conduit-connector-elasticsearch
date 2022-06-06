@@ -369,7 +369,10 @@ func (d *Destination) executeBulkRequest(ctx context.Context, data *bytes.Buffer
 	if err != nil {
 		return bulkResponse{}, fmt.Errorf("bulk response failure: failed to read the result: %w", err)
 	}
-	defer responseBody.Close()
+
+	if err := responseBody.Close(); err != nil {
+		return bulkResponse{}, fmt.Errorf("bulk response failure: failed to read the result: %w", err)
+	}
 
 	// Read individual errors
 	var response bulkResponse
