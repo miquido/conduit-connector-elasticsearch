@@ -15,7 +15,6 @@
 package destination
 
 import (
-	"sort"
 	"time"
 
 	sdk "github.com/conduitio/conduit-connector-sdk"
@@ -43,13 +42,4 @@ func (bq BufferQueue) Len() int {
 // Enqueue adds registers a new operation in queue.
 func (bq *BufferQueue) Enqueue(item *operation) {
 	*bq = append(*bq, item)
-}
-
-// Sort organizes queue operations by their CreatedAt property in ascending order.
-func (bq *BufferQueue) Sort() {
-	old := *bq
-
-	sort.SliceStable(old, func(i, j int) bool {
-		return old[i].CreatedAt.Before(old[j].CreatedAt)
-	})
 }

@@ -98,18 +98,6 @@ func (d *Destination) Flush(ctx context.Context) error {
 		return nil
 	}
 
-	// Sort operations to ensure the order
-	// Combined with big enough buffer, it minimizes (but not rids off completely) the risk when applying two or more
-	// consecutive operations leads to inconsistent result.
-	// Example:
-	//  Let there be two events: CREATE followed by DELETE received 1 second later. When DELETE arrives before CREATE,
-	//  it still should be applied after late CREATE. Doing DELETE first will result in record be created while it no
-	//  longer exists in the source.
-	// The edge case:
-	//  Assuming events from the previous example, when DELETE event arrives and fills the buffer, then this change is
-	//  applied immediately. CREATE will be applied in the next batch.
-	d.operationsQueue.Sort()
-
 	// Execute operations
 	retriesLeft := d.config.Retries
 
@@ -210,7 +198,7 @@ func (d *Destination) Flush(ctx context.Context) error {
 		// Set up for retry
 		retriesLeft--
 
-		d.operationsQueue = failedOperations // No need to sort since d.operationsQueue is already sorted
+		d.operationsQueue = failedOperations
 	}
 
 	// Reset buffer
