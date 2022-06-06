@@ -27,6 +27,7 @@ import (
 	esV6 "github.com/elastic/go-elasticsearch/v6"
 	"github.com/jaswdr/faker"
 	"github.com/miquido/conduit-connector-elasticsearch/destination"
+	"github.com/miquido/conduit-connector-elasticsearch/internal"
 	"github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch"
 	v6 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v6"
 	"github.com/stretchr/testify/require"
@@ -74,7 +75,7 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 		t.Run("can be upserted", func(t *testing.T) {
 			require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 				Metadata: map[string]string{
-					"action": "updated",
+					"action": internal.OperationUpdate,
 				},
 				Payload:   sdk.StructuredData(user1),
 				Key:       sdk.RawData(fmt.Sprintf("%.0f", user1["id"])),
@@ -82,7 +83,7 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 			}, ackFunc(t)))
 			require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 				Metadata: map[string]string{
-					"action": "created",
+					"action": internal.OperationUpdate,
 				},
 				Payload:   sdk.StructuredData(user2),
 				Key:       sdk.RawData(fmt.Sprintf("%.0f", user2["id"])),
@@ -101,7 +102,7 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 		t.Run("can be deleted", func(t *testing.T) {
 			require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 				Metadata: map[string]string{
-					"action": "deleted",
+					"action": internal.OperationDelete,
 				},
 				Payload:   nil,
 				Key:       sdk.RawData(fmt.Sprintf("%.0f", user1["id"])),
@@ -125,7 +126,7 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 			}, ackFunc(t)))
 			require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 				Metadata: map[string]string{
-					"action": "updated",
+					"action": internal.OperationUpdate,
 				},
 				Payload:   sdk.StructuredData(user2),
 				Key:       nil,
@@ -162,7 +163,7 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 		t.Run("can be upserted", func(t *testing.T) {
 			require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 				Metadata: map[string]string{
-					"action": "updated",
+					"action": internal.OperationUpdate,
 				},
 				Payload: sdk.RawData(fmt.Sprintf(
 					`{"id":%.f,"email":%q}`,
@@ -174,7 +175,7 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 			}, ackFunc(t)))
 			require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 				Metadata: map[string]string{
-					"action": "created",
+					"action": internal.OperationUpdate,
 				},
 				Payload: sdk.RawData(fmt.Sprintf(
 					`{"id":%.f,"email":%q}`,
@@ -197,7 +198,7 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 		t.Run("can be deleted", func(t *testing.T) {
 			require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 				Metadata: map[string]string{
-					"action": "deleted",
+					"action": internal.OperationDelete,
 				},
 				Payload:   nil,
 				Key:       sdk.RawData(fmt.Sprintf("%.0f", user1["id"])),
@@ -225,7 +226,7 @@ func TestOperationsWithSmallestBulkSize(t *testing.T) {
 			}, ackFunc(t)))
 			require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 				Metadata: map[string]string{
-					"action": "updated",
+					"action": internal.OperationUpdate,
 				},
 				Payload: sdk.RawData(fmt.Sprintf(
 					`{"id":%.f,"email":%q}`,
@@ -299,7 +300,7 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 	t.Run("writing first 3 records does persists them", func(t *testing.T) {
 		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 			Metadata: map[string]string{
-				"action": "updated",
+				"action": internal.OperationUpdate,
 			},
 			Payload:   sdk.StructuredData(user1),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user1["id"])),
@@ -307,7 +308,7 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 		}, ackFunc(t)))
 		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 			Metadata: map[string]string{
-				"action": "created",
+				"action": internal.OperationUpdate,
 			},
 			Payload:   sdk.StructuredData(user2),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user2["id"])),
@@ -315,7 +316,7 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 		}, ackFunc(t)))
 		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 			Metadata: map[string]string{
-				"action": "created",
+				"action": internal.OperationUpdate,
 			},
 			Payload:   sdk.StructuredData(user3),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user3["id"])),
@@ -335,7 +336,7 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 	t.Run("writing next 2 records does not persist them", func(t *testing.T) {
 		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 			Metadata: map[string]string{
-				"action": "updated",
+				"action": internal.OperationUpdate,
 			},
 			Payload:   sdk.StructuredData(user4),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user4["id"])),
@@ -343,7 +344,7 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 		}, ackFunc(t)))
 		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 			Metadata: map[string]string{
-				"action": "created",
+				"action": internal.OperationUpdate,
 			},
 			Payload:   sdk.StructuredData(user5),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user5["id"])),
@@ -363,7 +364,7 @@ func TestOperationsWithBiggerBulkSize(t *testing.T) {
 	t.Run("writing 1 more record fills the buffer and performs actions", func(t *testing.T) {
 		require.NoError(t, dest.WriteAsync(context.Background(), sdk.Record{
 			Metadata: map[string]string{
-				"action": "deleted",
+				"action": internal.OperationDelete,
 			},
 			Payload:   sdk.StructuredData(user3),
 			Key:       sdk.RawData(fmt.Sprintf("%.0f", user3["id"])),

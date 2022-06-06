@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	sdk "github.com/conduitio/conduit-connector-sdk"
+	"github.com/miquido/conduit-connector-elasticsearch/internal"
 	"github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch"
 )
 
@@ -38,21 +39,6 @@ type Destination struct {
 	mutex           sync.Mutex
 	operationsQueue BufferQueue
 }
-
-// Below is a list of all supported operations.
-// These come from Record's Metadata["action"] field, and they instruct the connector how the Record should be handled.
-// Some actions come in different flavour, e.g. "create" and "created". They mean the same action, but aim to support
-// as many different naming conventions as possible.
-// This can be dropped once standardised.
-const (
-	actionInsert  = "insert"
-	actionCreate  = "create"
-	actionCreated = "created"
-	actionUpdate  = "update"
-	actionUpdated = "updated"
-	actionDelete  = "delete"
-	actionDeleted = "deleted"
-)
 
 //go:generate moq -out client_moq_test.go . client
 type client = elasticsearch.Client
@@ -251,30 +237,29 @@ func (d *Destination) prepareBulkRequestPayload(ctx context.Context) (*bytes.Buf
 		}
 
 		if key == "" {
-			action = actionInsert
+			action = internal.OperationInsert
 		} else if action == "" {
-			action = actionCreate
+			action = internal.OperationUpdate
 		}
 
 		switch action {
-		case actionInsert:
+		case internal.OperationInsert:
 			if err := d.writeInsertOperation(data, record); err != nil {
 				return nil, err
 			}
 
-		case actionCreate, actionCreated,
-			actionUpdate, actionUpdated:
+		case internal.OperationUpdate:
 			if err := d.writeUpsertOperation(key, data, record); err != nil {
 				return nil, err
 			}
 
-		case actionDelete, actionDeleted:
+		case internal.OperationDelete:
 			if err := d.writeDeleteOperation(key, data); err != nil {
 				return nil, err
 			}
 
 		default:
-			sdk.Logger(ctx).Warn().Msgf("unsupported action: %+v", action)
+			sdk.Logger(ctx).Warn().Msgf("unsupported action: %s", action)
 
 			continue
 		}

@@ -28,6 +28,7 @@ import (
 
 	sdk "github.com/conduitio/conduit-connector-sdk"
 	"github.com/jaswdr/faker"
+	"github.com/miquido/conduit-connector-elasticsearch/internal"
 	"github.com/stretchr/testify/require"
 )
 
@@ -113,7 +114,7 @@ func TestDestination_Flush(t *testing.T) {
 			Record: sdk.Record{
 				CreatedAt: time.Now(),
 				Metadata: map[string]string{
-					"action": "insert",
+					"action": internal.OperationInsert,
 				},
 				Payload: sdk.StructuredData{
 					"id": fakerInstance.Int32(),
@@ -137,7 +138,7 @@ func TestDestination_Flush(t *testing.T) {
 			record1                  = sdk.Record{
 				CreatedAt: time.Now().Add(-time.Hour),
 				Metadata: map[string]string{
-					"action": "insert",
+					"action": internal.OperationInsert,
 				},
 				Payload: sdk.StructuredData{
 					"id": fakerInstance.Int32(),
@@ -150,7 +151,7 @@ func TestDestination_Flush(t *testing.T) {
 			record2                  = sdk.Record{
 				CreatedAt: time.Now(),
 				Metadata: map[string]string{
-					"action": "insert",
+					"action": internal.OperationInsert,
 				},
 				Payload: sdk.StructuredData{
 					"id": fakerInstance.Int32(),
@@ -163,7 +164,7 @@ func TestDestination_Flush(t *testing.T) {
 			record3                  = sdk.Record{
 				CreatedAt: time.Now().Add(time.Hour),
 				Metadata: map[string]string{
-					"action": "insert",
+					"action": internal.OperationInsert,
 				},
 				Payload: sdk.StructuredData{
 					"id": fakerInstance.Int32(),
@@ -336,7 +337,7 @@ func TestDestination_Flush(t *testing.T) {
 			record1                  = sdk.Record{
 				CreatedAt: time.Now().Add(-time.Hour),
 				Metadata: map[string]string{
-					"action": "insert",
+					"action": internal.OperationInsert,
 				},
 				Payload: sdk.StructuredData{
 					"id": fakerInstance.Int32(),
@@ -349,7 +350,7 @@ func TestDestination_Flush(t *testing.T) {
 			record2                  = sdk.Record{
 				CreatedAt: time.Now(),
 				Metadata: map[string]string{
-					"action": "insert",
+					"action": internal.OperationInsert,
 				},
 				Payload: sdk.StructuredData{
 					"id": fakerInstance.Int32(),
@@ -362,7 +363,7 @@ func TestDestination_Flush(t *testing.T) {
 			record3                  = sdk.Record{
 				CreatedAt: time.Now().Add(time.Hour),
 				Metadata: map[string]string{
-					"action": "insert",
+					"action": internal.OperationInsert,
 				},
 				Payload: sdk.StructuredData{
 					"id": fakerInstance.Int32(),
