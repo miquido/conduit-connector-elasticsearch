@@ -12,18 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package v8
 
 import (
+	"testing"
+
 	sdk "github.com/conduitio/conduit-connector-sdk"
 	es "github.com/miquido/conduit-connector-elasticsearch"
 	esDestination "github.com/miquido/conduit-connector-elasticsearch/destination"
+	"github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch"
 )
 
-func main() {
-	sdk.Serve(sdk.Connector{
-		NewSpecification: es.Specification,
-		NewSource:        nil,
-		NewDestination:   esDestination.NewDestination,
+func TestAcceptance(t *testing.T) {
+	sdk.AcceptanceTest(t, sdk.ConfigurableAcceptanceTestDriver{
+		Config: sdk.ConfigurableAcceptanceTestDriverConfig{
+			Connector: sdk.Connector{
+				NewSpecification: es.Specification,
+				NewSource:        nil,
+				NewDestination:   esDestination.NewDestination,
+			},
+
+			SourceConfig: map[string]string{},
+
+			DestinationConfig: map[string]string{
+				esDestination.ConfigKeyVersion:  elasticsearch.Version8,
+				esDestination.ConfigKeyHost:     "http://127.0.0.1:9200",
+				esDestination.ConfigKeyIndex:    "acceptance",
+				esDestination.ConfigKeyBulkSize: "1",
+			},
+		},
 	})
 }

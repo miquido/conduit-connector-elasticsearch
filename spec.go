@@ -92,7 +92,7 @@ func Specification() sdk.Specification {
 			},
 			destination.ConfigKeyRetries: {
 				Default:     "0",
-				Required:    true,
+				Required:    false,
 				Description: "The maximum number of retries of failed operations. The minimum value is `0` which disabled retry logic. The maximum value is `255.",
 			},
 		},
