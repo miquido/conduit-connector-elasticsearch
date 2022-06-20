@@ -28,11 +28,11 @@ import (
 	"go.uber.org/goleak"
 )
 
-type WithCustomRecordGeneratorDriver struct {
+type CustomConfigurableAcceptanceTestDriver struct {
 	sdk.ConfigurableAcceptanceTestDriver
 }
 
-func (d *WithCustomRecordGeneratorDriver) GenerateRecord(t *testing.T) sdk.Record {
+func (d *CustomConfigurableAcceptanceTestDriver) GenerateRecord(t *testing.T) sdk.Record {
 	record := d.ConfigurableAcceptanceTestDriver.GenerateRecord(t)
 
 	// Override Key
@@ -53,7 +53,7 @@ func (d *WithCustomRecordGeneratorDriver) GenerateRecord(t *testing.T) sdk.Recor
 	return record
 }
 
-func (d *WithCustomRecordGeneratorDriver) ReadFromDestination(_ *testing.T, records []sdk.Record) []sdk.Record {
+func (d *CustomConfigurableAcceptanceTestDriver) ReadFromDestination(_ *testing.T, records []sdk.Record) []sdk.Record {
 	// No source connector, return wanted records
 	return records
 }
@@ -69,7 +69,7 @@ func TestAcceptance(t *testing.T) {
 		esDestination.ConfigKeyBulkSize: "100",
 	}
 
-	sdk.AcceptanceTest(t, &WithCustomRecordGeneratorDriver{
+	sdk.AcceptanceTest(t, &CustomConfigurableAcceptanceTestDriver{
 		ConfigurableAcceptanceTestDriver: sdk.ConfigurableAcceptanceTestDriver{
 			Config: sdk.ConfigurableAcceptanceTestDriverConfig{
 				Connector: sdk.Connector{
