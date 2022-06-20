@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v8
+package v7
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ import (
 	es "github.com/miquido/conduit-connector-elasticsearch"
 	esDestination "github.com/miquido/conduit-connector-elasticsearch/destination"
 	"github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch"
-	v8 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v8"
+	v7 "github.com/miquido/conduit-connector-elasticsearch/internal/elasticsearch/v7"
 	"go.uber.org/goleak"
 )
 
@@ -62,7 +62,7 @@ func TestAcceptance(t *testing.T) {
 	var dest *esDestination.Destination
 
 	destinationConfig := map[string]string{
-		esDestination.ConfigKeyVersion:  elasticsearch.Version8,
+		esDestination.ConfigKeyVersion:  elasticsearch.Version7,
 		esDestination.ConfigKeyHost:     "http://127.0.0.1:9200",
 		esDestination.ConfigKeyIndex:    "acceptance_idx",
 		esDestination.ConfigKeyBulkSize: "100",
@@ -88,7 +88,7 @@ func TestAcceptance(t *testing.T) {
 				AfterTest: func(t *testing.T) {
 					if client := dest.GetClient(); client != nil {
 						assertIndexIsDeleted(
-							client.(*v8.Client).GetClient(),
+							client.(*v7.Client).GetClient(),
 							destinationConfig[esDestination.ConfigKeyIndex],
 						)
 					}

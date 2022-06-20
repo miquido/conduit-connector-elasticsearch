@@ -24,10 +24,11 @@ import (
 
 func Specification() sdk.Specification {
 	return sdk.Specification{
-		Name:    "elasticsearch",
-		Summary: "An Elasticsearch destination plugin for Conduit.",
-		Version: "v0.1.0",
-		Author:  "Miquido",
+		Name:        "elasticsearch",
+		Summary:     "An Elasticsearch destination plugin for Conduit.",
+		Description: "The Conduit plugin supporting Elasticsearch destination.",
+		Version:     "v0.1.0",
+		Author:      "Miquido",
 		DestinationParams: map[string]sdk.Parameter{
 			destination.ConfigKeyVersion: {
 				Default:  "",
