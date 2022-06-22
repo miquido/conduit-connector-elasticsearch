@@ -8,7 +8,7 @@ require (
 	github.com/elastic/go-elasticsearch/v6 v6.8.10
 	github.com/elastic/go-elasticsearch/v7 v7.17.1
 	github.com/elastic/go-elasticsearch/v8 v8.2.0
-	github.com/jaswdr/faker v1.10.2
+	github.com/jaswdr/faker v1.11.0
 	github.com/stretchr/testify v1.7.4
 )
 
