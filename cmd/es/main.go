@@ -21,5 +21,9 @@ import (
 )
 
 func main() {
-	sdk.Serve(es.Specification, nil, esDestination.NewDestination)
+	sdk.Serve(sdk.Connector{
+		NewSpecification: es.Specification,
+		NewSource:        nil,
+		NewDestination:   esDestination.NewDestination,
+	})
 }
